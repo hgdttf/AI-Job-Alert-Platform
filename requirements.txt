@@ -1,0 +1,8 @@
+streamlit
+pandas
+requests
+beautifulsoup4
+APScheduler
+python-jobspy
+lxml
+python-dotenv
