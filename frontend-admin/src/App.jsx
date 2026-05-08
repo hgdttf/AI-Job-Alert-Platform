@@ -1,67 +1,55 @@
-import { useEffect, useState } from "react";
-import axios from "axios";
+import { useEffect, useState, useCallback } from "react";
+import API from "./api";
 
 export default function App() {
-
   const [email, setEmail] = useState("");
-
   const [password, setPassword] = useState("");
 
-  const [token, setToken] = useState(
-    localStorage.getItem("admin_token")
-  );
+  const [token, setToken] = useState(() => {
+  return localStorage.getItem("admin_token");
+});
 
   const [users, setUsers] = useState([]);
 
-  const BACKEND_URL = "http://127.0.0.1:8000";
-
+  const [error, setError] = useState("");
 
   // =========================
   // FETCH USERS
   // =========================
 
-const fetchUsers = async () => {
-
-  try {
-
-    const response = await axios.get(
-      `${BACKEND_URL}/admin/users`,
-      {
+  const fetchUsers = useCallback(async () => {
+    try {
+      const response = await API.get("/admin/users", {
         headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    );
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    setUsers(response.data);
+      setUsers(response.data);
 
-  } catch (error) {
-
-    console.log(error);
-
-  }
-
-};
-
+    } catch (error) {
+      console.error(error);
+      setError("Failed to fetch users");
+    }
+  }, [token]);
 
   // =========================
   // LOGIN
   // =========================
 
   const login = async () => {
-
     try {
+      setError("");
 
-      const response = await axios.post(
-        `${BACKEND_URL}/admin/login`,
+      const response = await API.post(
+        "/admin/login",
         {
           email,
-          password
+          password,
         }
       );
 
-      const accessToken =
-        response.data.access_token;
+      const accessToken = response.data.access_token;
 
       localStorage.setItem(
         "admin_token",
@@ -71,97 +59,81 @@ const fetchUsers = async () => {
       setToken(accessToken);
 
     } catch (error) {
-
-      alert("Invalid credentials");
-
-      console.log(error);
-
+      console.error(error);
+      setError("Invalid credentials");
     }
-
   };
-
 
   // =========================
   // DELETE USER
   // =========================
 
   const deleteUser = async (userId) => {
-
     try {
-
-      await axios.delete(
-        `${BACKEND_URL}/admin/delete-user/${userId}`,
+      await API.delete(
+        `/admin/delete-user/${userId}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 
-      fetchUsers();
+      await fetchUsers();
 
     } catch (error) {
-
-      console.log(error);
-
+      console.error(error);
+      setError("Failed to delete user");
     }
-
   };
 
-
   // =========================
-  // LOAD USERS
+  // LOAD USERS AFTER LOGIN
   // =========================
 
   useEffect(() => {
 
-    if (!token) return;
+  const loadUsers = async () => {
 
-    // call async loader inside effect to avoid calling setState synchronously
-    const load = async () => {
-      try {
-        await fetchUsers();
-      } catch (err) {
-        console.error(err);
-      }
-    };
+    if (token) {
+      await fetchUsers();
+    }
 
-    void load();
+  };
 
-  }, [token, fetchUsers]);
+  loadUsers();
 
-
+}, [token, fetchUsers]);
   // =========================
   // LOGIN SCREEN
   // =========================
 
   if (!token) {
-
     return (
-
-      <div className="
-        min-h-screen
-        bg-slate-950
-        flex
-        items-center
-        justify-center
-      ">
-
-        <div className="
-          bg-slate-900
-          p-10
-          rounded-3xl
-          w-[400px]
-          shadow-2xl
-        ">
-
-          <h1 className="
-            text-4xl
-            font-bold
-            text-white
-            mb-8
-            text-center
-          ">
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          background: "#0f172a",
+          color: "white",
+        }}
+      >
+        <div
+          style={{
+            width: "350px",
+            padding: "30px",
+            borderRadius: "12px",
+            background: "#1e293b",
+          }}
+        >
+          <h1
+            style={{
+              marginBottom: "20px",
+              textAlign: "center",
+            }}
+          >
             Admin Login
           </h1>
 
@@ -172,253 +144,167 @@ const fetchUsers = async () => {
             onChange={(e) =>
               setEmail(e.target.value)
             }
-            className="
-              w-full
-              p-4
-              rounded-xl
-              bg-slate-800
-              text-white
-              mb-5
-              outline-none
-            "
+            style={{
+              width: "100%",
+              padding: "12px",
+              marginBottom: "15px",
+              borderRadius: "8px",
+              border: "none",
+            }}
           />
 
           <input
             type="password"
-            placeholder="Password"
+            placeholder="Admin Password"
             value={password}
             onChange={(e) =>
               setPassword(e.target.value)
             }
-            className="
-              w-full
-              p-4
-              rounded-xl
-              bg-slate-800
-              text-white
-              mb-5
-              outline-none
-            "
+            style={{
+              width: "100%",
+              padding: "12px",
+              marginBottom: "15px",
+              borderRadius: "8px",
+              border: "none",
+            }}
           />
 
           <button
             onClick={login}
-            className="
-              w-full
-              bg-blue-600
-              hover:bg-blue-700
-              transition
-              text-white
-              p-4
-              rounded-xl
-              font-semibold
-            "
+            style={{
+              width: "100%",
+              padding: "12px",
+              border: "none",
+              borderRadius: "8px",
+              background: "#2563eb",
+              color: "white",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
           >
             Login
           </button>
 
+          {error && (
+            <p
+              style={{
+                color: "red",
+                marginTop: "15px",
+                textAlign: "center",
+              }}
+            >
+              {error}
+            </p>
+          )}
         </div>
-
       </div>
-
     );
-
   }
 
-
   // =========================
-  // DASHBOARD
+  // ADMIN DASHBOARD
   // =========================
 
   return (
-
-    <div className="
-      min-h-screen
-      bg-slate-950
-      text-white
-      px-6
-      py-8
-    ">
-
-      {/* HEADER */}
-
-      <div className="
-        flex
-        justify-between
-        items-center
-        mb-8
-      ">
-
-        <div>
-
-          <h1 className="
-            text-4xl
-            font-bold
-          ">
-            JobPulse Admin
-          </h1>
-
-          <p className="
-            text-slate-400
-            mt-1
-          ">
-            Manage registered users
-          </p>
-
-        </div>
+    <div
+      style={{
+        minHeight: "100vh",
+        padding: "30px",
+        background: "#0f172a",
+        color: "white",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "30px",
+        }}
+      >
+        <h1>Admin Dashboard</h1>
 
         <button
           onClick={() => {
-
             localStorage.removeItem(
               "admin_token"
             );
 
-            setToken(null);
-
+            setToken("");
           }}
-          className="
-            bg-red-600
-            hover:bg-red-700
-            px-4
-            py-2
-            rounded-lg
-            text-sm
-            font-semibold
-            transition
-          "
+          style={{
+            padding: "10px 20px",
+            border: "none",
+            borderRadius: "8px",
+            background: "red",
+            color: "white",
+            cursor: "pointer",
+          }}
         >
           Logout
         </button>
-
       </div>
 
-
-      {/* STATS */}
-
-      <div className="
-        bg-slate-900
-        rounded-2xl
-        p-5
-        mb-8
-        border
-        border-slate-800
-      ">
-
-        <p className="
-          text-slate-400
-          text-sm
-        ">
-          Total Registered Users
+      {error && (
+        <p
+          style={{
+            color: "red",
+            marginBottom: "20px",
+          }}
+        >
+          {error}
         </p>
+      )}
 
-        <h2 className="
-          text-4xl
-          font-bold
-          mt-2
-        ">
-          {users.length}
-        </h2>
+      <div
+        style={{
+          display: "grid",
+          gap: "20px",
+        }}
+      >
+        {users.map((user) => (
+          <div
+            key={user.id}
+            style={{
+              background: "#1e293b",
+              padding: "20px",
+              borderRadius: "12px",
+            }}
+          >
+            <p>
+              <strong>Email:</strong>{" "}
+              {user.email}
+            </p>
 
-      </div>
+            <p>
+              <strong>Categories:</strong>{" "}
+              {user.categories}
+            </p>
 
+            <p>
+              <strong>Delivery Time:</strong>{" "}
+              {user.delivery_time}
+            </p>
 
-      {/* USERS */}
-
-      <div className="
-        grid
-        gap-4
-      ">
-
-        {users.length === 0 ? (
-
-          <div className="
-            bg-slate-900
-            p-8
-            rounded-2xl
-            text-center
-            text-slate-400
-          ">
-            No users registered
-          </div>
-
-        ) : (
-
-          users.map((user) => (
-
-            <div
-              key={user.id}
-              className="
-                bg-slate-900
-                rounded-2xl
-                p-5
-                border
-                border-slate-800
-                flex
-                justify-between
-                items-center
-              "
+            <button
+              onClick={() =>
+                deleteUser(user.id)
+              }
+              style={{
+                marginTop: "15px",
+                padding: "10px 15px",
+                border: "none",
+                borderRadius: "8px",
+                background: "red",
+                color: "white",
+                cursor: "pointer",
+              }}
             >
-
-              <div>
-
-                <h2 className="
-                  text-xl
-                  font-semibold
-                  mb-2
-                ">
-                  {user.email}
-                </h2>
-
-                <p className="
-                  text-slate-400
-                  text-sm
-                ">
-                  Time:
-                  {" "}
-                  {user.delivery_time}
-                </p>
-
-                <p className="
-                  text-slate-400
-                  text-sm
-                  mt-1
-                ">
-                  Categories:
-                  {" "}
-                  {user.categories}
-                </p>
-
-              </div>
-
-              <button
-                onClick={() =>
-                  deleteUser(user.id)
-                }
-                className="
-                  bg-red-600
-                  hover:bg-red-700
-                  px-4
-                  py-2
-                  rounded-lg
-                  text-sm
-                  font-semibold
-                  transition
-                "
-              >
-                Delete
-              </button>
-
-            </div>
-
-          ))
-
-        )}
-
+              Delete User
+            </button>
+          </div>
+        ))}
       </div>
-
     </div>
-
   );
-
 }
