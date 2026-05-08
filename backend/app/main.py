@@ -1,52 +1,16 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import Column, Integer, String
 
-from .database import Base, engine
-from .routes import router
-from .admin_routes import router as admin_router
-from .scheduler import start_scheduler
-
-Base.metadata.create_all(bind=engine)
-
-app = FastAPI(title="JobPulse AI")
+from .database import Base
 
 
-# =========================
-# CORS
-# =========================
+class User(Base):
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    __tablename__ = "users"
 
+    id = Column(Integer, primary_key=True, index=True)
 
-# =========================
-# ROUTES
-# =========================
+    email = Column(String, unique=True, index=True)
 
-app.include_router(router)
+    categories = Column(String)
 
-app.include_router(admin_router)
-
-
-# =========================
-# ROOT
-# =========================
-
-@app.get("/")
-def root():
-
-    return {
-        "message": "JobPulse AI Backend Running"
-    }
-
-
-# =========================
-# START SCHEDULER
-# =========================
-
-start_scheduler()
+    delivery_time = Column(String)

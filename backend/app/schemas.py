@@ -1,8 +1,9 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import List
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
+
+    email: str
     categories: List[str]
     delivery_time: str
