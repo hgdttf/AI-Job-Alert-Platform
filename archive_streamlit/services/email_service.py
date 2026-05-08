@@ -3,7 +3,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from config.settings import (
+from PythonProjectforJobs.old_streamlit_backup.config.settings import (
     EMAIL_SENDER,
     EMAIL_PASSWORD
 )

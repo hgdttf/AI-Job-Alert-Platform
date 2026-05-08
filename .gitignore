@@ -1,5 +1,14 @@
 venv/
+node_modules/
+
 __pycache__/
-.env
-platform.db
 *.pyc
+
+dist/
+build/
+
+.env
+
+.vscode/
+
+jobs.db

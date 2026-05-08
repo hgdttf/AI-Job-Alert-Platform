@@ -1,5 +1,5 @@
 from jobspy import scrape_jobs
-from config.settings import SEARCH_TERMS
+from PythonProjectforJobs.old_streamlit_backup.config.settings import SEARCH_TERMS
 
 
 def get_linkedin_jobs():
