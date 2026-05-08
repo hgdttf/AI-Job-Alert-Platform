@@ -90,7 +90,7 @@ export default function App() {
     try {
       await API.post("/register", {
         email,
-        categories: selectedCategories.join(","),
+        categories: selectedCategories,
         delivery_time: selectedTime,
       });
 
