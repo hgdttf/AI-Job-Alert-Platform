@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -35,8 +36,8 @@ def admin_login(data: dict):
     email = data.get("email")
     password = data.get("password")
 
-    ADMIN_EMAIL = "admin@jobpulse.ai"
-    ADMIN_PASSWORD = "admin123"
+    ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
     if (
         email == ADMIN_EMAIL
