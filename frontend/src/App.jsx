@@ -40,6 +40,7 @@ export default function App() {
   const [period, setPeriod] = useState("AM");
   const [users, setUsers] = useState([]);
   const [message, setMessage] = useState({ text: "", type: "" });
+  const [emailError, setEmailError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const selectedTime = `${hour}:${minute} ${period}`;
@@ -75,9 +76,10 @@ export default function App() {
 
   const registerUser = async () => {
     setMessage({ text: "", type: "" });
+    setEmailError("");
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setMessage({ text: "Please enter a valid email address.", type: "error" });
+      setEmailError("Please enter a valid email address.");
       return;
     }
 
@@ -102,7 +104,17 @@ export default function App() {
       setPeriod("AM");
       fetchUsers();
     } catch (error) {
-      setMessage({ text: error.message || "Registration failed. Try again.", type: "error" });
+      const detail = error.response?.data?.detail || "";
+      const isAlreadyRegistered =
+        detail.toLowerCase().includes("already") ||
+        detail.toLowerCase().includes("exist") ||
+        detail.toLowerCase().includes("registered");
+
+      if (isAlreadyRegistered) {
+        setEmailError("This email is already registered.");
+      } else {
+        setMessage({ text: detail || "Something went wrong", type: "error" });
+      }
     } finally {
       setLoading(false);
     }
@@ -403,6 +415,40 @@ export default function App() {
           box-shadow: 0 0 0 3px rgba(34,211,238,0.08);
         }
 
+        .text-input.has-error {
+          border-color: rgba(239,68,68,0.6);
+        }
+
+        .text-input.has-error:focus {
+          border-color: rgba(239,68,68,0.8);
+          box-shadow: 0 0 0 3px rgba(239,68,68,0.1);
+        }
+
+        .field-error {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 8px;
+          padding: 9px 13px;
+          background: rgba(239,68,68,0.08);
+          border: 1px solid rgba(239,68,68,0.25);
+          border-radius: var(--radius-sm);
+          color: #fca5a5;
+          font-size: 13px;
+          font-weight: 400;
+          animation: slideDown 0.2s ease;
+        }
+
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .field-error-icon {
+          font-size: 14px;
+          flex-shrink: 0;
+        }
+
         /* TIME SELECTOR */
         .time-row {
           display: flex;
@@ -680,9 +726,15 @@ export default function App() {
                 type="email"
                 placeholder="you@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="text-input"
+                onChange={(e) => { setEmail(e.target.value); setEmailError(""); }}
+                className={`text-input ${emailError ? "has-error" : ""}`}
               />
+              {emailError && (
+                <div className="field-error">
+                  <span className="field-error-icon">⚠️</span>
+                  {emailError}
+                </div>
+              )}
             </div>
 
             {/* Delivery Time */}
