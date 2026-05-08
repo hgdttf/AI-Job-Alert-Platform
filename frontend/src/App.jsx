@@ -180,403 +180,190 @@ export default function App() {
   // =========================
 
   return (
+  <div className="min-h-screen bg-[#020617] text-white overflow-hidden">
+    
+    {/* Background Effects */}
+    <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-blue-500/5 to-purple-500/10 blur-3xl"></div>
 
-    <div
-      style={{
-        minHeight: "100vh",
-        background:
-          "#020617",
-        color: "white",
-        padding: "40px",
-        fontFamily: "Arial",
-      }}
-    >
+    {/* Navbar */}
+    <nav className="relative z-10 flex items-center justify-between px-8 py-6 border-b border-white/10 backdrop-blur-md">
+      <h1 className="text-2xl font-bold tracking-wide">
+        JobPulse AI
+      </h1>
 
-      {/* HERO */}
+      <div className="hidden md:flex gap-8 text-sm text-gray-300">
+        <a href="#" className="hover:text-cyan-400 transition">
+          Features
+        </a>
 
-      <div
-        style={{
-          textAlign: "center",
-          marginBottom: "40px",
-        }}
-      >
+        <a href="#" className="hover:text-cyan-400 transition">
+          Categories
+        </a>
 
-        <h1
-          style={{
-            fontSize: "52px",
-            marginBottom: "10px",
-          }}
-        >
-          AI-Powered Job Alert Platform
+        <a href="#" className="hover:text-cyan-400 transition">
+          Alerts
+        </a>
+      </div>
+    </nav>
+
+    {/* Hero Section */}
+    <section className="relative z-10 max-w-7xl mx-auto px-6 py-20 grid lg:grid-cols-2 gap-16 items-center">
+
+      {/* Left Side */}
+      <div>
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 text-sm mb-6">
+          AI Powered Job Aggregation
+        </div>
+
+        <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6">
+          Discover Fresh
+          <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+            {" "}Jobs Faster
+          </span>
         </h1>
 
-        <p
-          style={{
-            color: "#94a3b8",
-            fontSize: "18px",
-          }}
-        >
-          Daily fresher jobs,
-          internships and
-          research opportunities
-          delivered automatically.
+        <p className="text-gray-400 text-lg leading-relaxed mb-10 max-w-xl">
+          Automated AI-powered alerts for internships, fresher jobs,
+          research opportunities, and remote positions delivered directly
+          to your inbox every day.
         </p>
 
-      </div>
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-xl">
+            <h2 className="text-3xl font-bold text-cyan-400">
+              {users.length}
+            </h2>
 
-      {/* STATS */}
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: "20px",
-          marginBottom: "40px",
-          flexWrap: "wrap",
-        }}
-      >
-
-        <div style={cardStyle}>
-          <h2>{users.length}</h2>
-          <p>Registered Users</p>
-        </div>
-
-        <div style={cardStyle}>
-          <h2>24/7</h2>
-          <p>Live Alerts</p>
-        </div>
-
-        <div style={cardStyle}>
-          <h2>10</h2>
-          <p>Categories</p>
-        </div>
-
-      </div>
-
-      {/* FORM */}
-
-      <div
-        style={{
-          maxWidth: "700px",
-          margin: "0 auto",
-          background: "#0f172a",
-          padding: "35px",
-          borderRadius: "18px",
-          border:
-            "1px solid #1e293b",
-        }}
-      >
-
-        <h2
-          style={{
-            marginBottom: "25px",
-          }}
-        >
-          Register For Daily Alerts
-        </h2>
-
-        {/* EMAIL */}
-
-        <div
-          style={{
-            marginBottom: "25px",
-          }}
-        >
-
-          <p>Email Address</p>
-
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(e) =>
-              setEmail(e.target.value)
-            }
-            style={inputStyle}
-          />
-
-        </div>
-
-        {/* TIME */}
-
-        <div
-          style={{
-            marginBottom: "25px",
-          }}
-        >
-
-          <p>Select Delivery Time</p>
-
-          <div
-            style={{
-              display: "flex",
-              gap: "10px",
-              alignItems: "center",
-            }}
-          >
-
-            <select
-              value={hour}
-              onChange={(e) =>
-                setHour(e.target.value)
-              }
-              style={selectStyle}
-            >
-
-              {Array.from(
-                { length: 12 },
-                (_, i) =>
-                  String(i + 1).padStart(2, "0")
-              ).map((h) => (
-                <option
-                  key={h}
-                  value={h}
-                >
-                  {h}
-                </option>
-              ))}
-
-            </select>
-
-            <span>:</span>
-
-            <select
-              value={minute}
-              onChange={(e) =>
-                setMinute(e.target.value)
-              }
-              style={selectStyle}
-            >
-
-              {Array.from(
-                { length: 60 },
-                (_, i) =>
-                  String(i).padStart(2, "0")
-              ).map((m) => (
-                <option
-                  key={m}
-                  value={m}
-                >
-                  {m}
-                </option>
-              ))}
-
-            </select>
-
-            <select
-              value={period}
-              onChange={(e) =>
-                setPeriod(e.target.value)
-              }
-              style={selectStyle}
-            >
-
-              <option value="AM">
-                AM
-              </option>
-
-              <option value="PM">
-                PM
-              </option>
-
-            </select>
-
+            <p className="text-gray-400 text-sm mt-1">
+              Registered Users
+            </p>
           </div>
 
-          <p
-            style={{
-              color: "#38bdf8",
-              marginTop: "10px",
-            }}
-          >
-            Selected Time:
-            {" "}
-            {selectedTime}
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-xl">
+            <h2 className="text-3xl font-bold text-cyan-400">
+              24/7
+            </h2>
+
+            <p className="text-gray-400 text-sm mt-1">
+              Smart Alerts
+            </p>
+          </div>
+
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-xl">
+            <h2 className="text-3xl font-bold text-cyan-400">
+              10+
+            </h2>
+
+            <p className="text-gray-400 text-sm mt-1">
+              Categories
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side Form */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-3xl blur-2xl opacity-20"></div>
+
+        <div className="relative bg-white/5 border border-white/10 backdrop-blur-2xl rounded-3xl p-8 shadow-2xl">
+
+          <h2 className="text-3xl font-bold mb-2">
+            Register For Alerts
+          </h2>
+
+          <p className="text-gray-400 mb-8">
+            Stay updated with the latest opportunities.
           </p>
 
-        </div>
+          {/* Email */}
+          <div className="mb-6">
+            <label className="block mb-3 text-sm text-gray-300">
+              Email Address
+            </label>
 
-        {/* CATEGORIES */}
+            <input
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-[#020617] border border-white/10 rounded-xl px-4 py-4 focus:outline-none focus:border-cyan-400 transition"
+            />
+          </div>
 
-        <div
-          style={{
-            marginBottom: "30px",
-          }}
-        >
+          {/* Time Selector */}
+          <div className="mb-8">
+            <label className="block mb-3 text-sm text-gray-300">
+              Delivery Time
+            </label>
 
-          <p>Select Categories</p>
-
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "10px",
-              marginTop: "15px",
-            }}
-          >
-
-            {categories.map((category) => (
-
-              <button
-                key={category}
-                onClick={() =>
-                  toggleCategory(category)
-                }
-                style={{
-                  padding:
-                    "10px 16px",
-
-                  borderRadius: "12px",
-
-                  border:
-                    selectedCategories.includes(
-                      category
-                    )
-                      ? "none"
-                      : "1px solid #334155",
-
-                  background:
-                    selectedCategories.includes(
-                      category
-                    )
-                      ? "linear-gradient(to right, #06b6d4, #3b82f6)"
-                      : "#0f172a",
-
-                  color: "white",
-
-                  cursor: "pointer",
-                }}
+            <div className="flex gap-3">
+              <select
+                value={hour}
+                onChange={(e) => setHour(e.target.value)}
+                className="bg-[#020617] border border-white/10 rounded-xl px-4 py-3"
               >
+                {hours.map((h) => (
+                  <option key={h}>{h}</option>
+                ))}
+              </select>
 
-                {category}
+              <select
+                value={minute}
+                onChange={(e) => setMinute(e.target.value)}
+                className="bg-[#020617] border border-white/10 rounded-xl px-4 py-3"
+              >
+                {minutes.map((m) => (
+                  <option key={m}>{m}</option>
+                ))}
+              </select>
 
-              </button>
-
-            ))}
-
-          </div>
-
-        </div>
-
-        {/* BUTTON */}
-
-        <button
-          onClick={registerUser}
-          style={{
-            width: "100%",
-            padding: "16px",
-            border: "none",
-            borderRadius: "14px",
-            background:
-              "linear-gradient(to right, #06b6d4, #2563eb)",
-            color: "white",
-            fontWeight: "bold",
-            fontSize: "16px",
-            cursor: "pointer",
-          }}
-        >
-          Activate Alerts
-        </button>
-
-        {/* MESSAGE */}
-
-        {message && (
-
-          <div
-            style={{
-              marginTop: "20px",
-              padding: "15px",
-              borderRadius: "10px",
-
-              background:
-                message.includes(
-                  "successful"
-                )
-                  ? "#14532d"
-                  : "#7f1d1d",
-
-              textAlign: "center",
-            }}
-          >
-
-            {message}
-
-          </div>
-
-        )}
-
-      </div>
-
-      {/* USERS */}
-
-      <div
-        style={{
-          marginTop: "60px",
-          maxWidth: "900px",
-          marginLeft: "auto",
-          marginRight: "auto",
-        }}
-      >
-
-        <h2
-          style={{
-            marginBottom: "20px",
-          }}
-        >
-          Registered Users
-        </h2>
-
-        <div
-          style={{
-            display: "grid",
-            gap: "20px",
-          }}
-        >
-
-          {users.map((user) => (
-
-            <div
-              key={user.id}
-              style={{
-                background: "#0f172a",
-                padding: "20px",
-                borderRadius: "14px",
-                border:
-                  "1px solid #1e293b",
-              }}
-            >
-
-              <p>
-                <strong>Email:</strong>
-                {" "}
-                {user.email}
-              </p>
-
-              <p>
-                <strong>Categories:</strong>
-                {" "}
-                {user.categories}
-              </p>
-
-              <p>
-                <strong>Delivery Time:</strong>
-                {" "}
-                {user.delivery_time}
-              </p>
-
+              <select
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+                className="bg-[#020617] border border-white/10 rounded-xl px-4 py-3"
+              >
+                <option>AM</option>
+                <option>PM</option>
+              </select>
             </div>
+          </div>
 
-          ))}
+          {/* Categories */}
+          <div className="mb-8">
+            <label className="block mb-4 text-sm text-gray-300">
+              Categories
+            </label>
 
+            <div className="flex flex-wrap gap-3">
+              {categories.map((category) => (
+                <button
+                  key={category}
+                  onClick={() => toggleCategory(category)}
+                  className={`px-4 py-2 rounded-xl border transition-all duration-300 ${
+                    selectedCategories.includes(category)
+                      ? "bg-cyan-500 text-black border-cyan-400"
+                      : "bg-white/5 border-white/10 hover:border-cyan-400"
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Submit */}
+          <button
+            onClick={registerUser}
+            className="w-full py-4 rounded-xl font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 hover:scale-[1.02] transition-all duration-300 shadow-lg shadow-cyan-500/20"
+          >
+            Activate Alerts
+          </button>
         </div>
-
       </div>
-
-    </div>
-
-  );
-
-}
+    </section>
+  </div>
+)}
 
 // =========================
 // STYLES
