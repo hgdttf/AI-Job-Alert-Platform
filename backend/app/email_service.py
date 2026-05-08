@@ -1,11 +1,15 @@
+import os
 import smtplib
+
+from dotenv import load_dotenv
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from dotenv import load_dotenv
 
-import os
+# =========================
+# LOAD ENV VARIABLES
+# =========================
 
 load_dotenv()
 
@@ -13,91 +17,114 @@ EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
 
+# =========================
+# SEND JOB EMAIL
+# =========================
+
 def send_job_email(receiver_email, jobs):
 
-    if len(jobs) == 0:
+    try:
 
-        print("No jobs found. Email skipped.")
+        # Prevent empty emails
+        if not jobs or len(jobs) == 0:
 
-        return
+            print("No jobs found. Email skipped.")
 
-    html_jobs = ""
+            return
 
-    for job in jobs[:15]:
+        html_jobs = ""
 
-        html_jobs += f"""
-        <div style="
-            padding:15px;
-            margin-bottom:15px;
-            border-radius:10px;
-            background:#0f172a;
+        for job in jobs[:15]:
+
+            html_jobs += f"""
+            <div style="
+                padding:20px;
+                margin-bottom:20px;
+                border-radius:12px;
+                background:#0f172a;
+                border:1px solid #1e293b;
+            ">
+
+                <h2 style="
+                    color:#38bdf8;
+                    margin-bottom:10px;
+                ">
+                    {job.get('title', 'Unknown Title')}
+                </h2>
+
+                <p style="color:white;">
+                    <strong>Company:</strong>
+                    {job.get('company', 'Unknown')}
+                </p>
+
+                <p style="color:white;">
+                    <strong>Category:</strong>
+                    {job.get('category', 'General')}
+                </p>
+
+                <a
+                    href="{job.get('link', '#')}"
+                    style="
+                        color:#22c55e;
+                        text-decoration:none;
+                        font-weight:bold;
+                    "
+                >
+                    Apply Here →
+                </a>
+
+            </div>
+            """
+
+        html = f"""
+        <html>
+
+        <body style="
+            background:#020617;
+            color:white;
+            font-family:Arial, sans-serif;
+            padding:30px;
         ">
 
-            <h2 style="color:#38bdf8;">
-                {job['title']}
-            </h2>
+            <div style="
+                max-width:700px;
+                margin:auto;
+            ">
 
-            <p style="color:white;">
-                <strong>Company:</strong>
-                {job['company']}
-            </p>
+                <h1 style="
+                    color:#38bdf8;
+                    margin-bottom:10px;
+                ">
+                    JobPulse AI
+                </h1>
 
-            <p style="color:white;">
-                <strong>Category:</strong>
-                {job['category']}
-            </p>
+                <p style="
+                    color:#cbd5e1;
+                    margin-bottom:30px;
+                ">
+                    Latest curated opportunities for you.
+                </p>
 
-            <a
-                href="{job['link']}"
-                style="
-                    color:#22c55e;
-                    text-decoration:none;
-                "
-            >
-                Apply Here
-            </a>
+                {html_jobs}
 
-        </div>
+            </div>
+
+        </body>
+
+        </html>
         """
 
-    html = f"""
-    <html>
+        message = MIMEMultipart("alternative")
 
-    <body style="
-        background:#020617;
-        color:white;
-        font-family:Arial;
-        padding:20px;
-    ">
+        message["Subject"] = "JobPulse AI - Fresh Opportunities"
 
-        <h1 style="color:#38bdf8;">
-            JobPulse AI
-        </h1>
+        message["From"] = EMAIL_ADDRESS
 
-        <p>
-            Latest curated opportunities for you.
-        </p>
+        message["To"] = receiver_email
 
-        {html_jobs}
-
-    </body>
-
-    </html>
-    """
-
-    message = MIMEMultipart("alternative")
-
-    message["Subject"] = "JobPulse AI - Daily Jobs"
-
-    message["From"] = EMAIL_ADDRESS
-
-    message["To"] = receiver_email
-
-    message.attach(
-        MIMEText(html, "html")
-    )
-
-    try:
+        message.attach(
+            MIMEText(html, "html")
+        )
 
         with smtplib.SMTP(
             "smtp.gmail.com",
@@ -117,8 +144,8 @@ def send_job_email(receiver_email, jobs):
                 message.as_string()
             )
 
-        print(f"Email sent to {receiver_email}")
+        print(f"Email sent successfully to {receiver_email}")
 
     except Exception as e:
 
-        print("Email error:", e)
+        print(f"Email sending failed: {str(e)}")

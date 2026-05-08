@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,11 +17,27 @@ Base.metadata.create_all(bind=engine)
 
 
 # =========================
+# LIFESPAN EVENT
+# =========================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    # Start scheduler once
+    start_scheduler()
+
+    yield
+
+    # Shutdown logic (optional)
+
+
+# =========================
 # FASTAPI APP
 # =========================
 
 app = FastAPI(
-    title="JobPulse AI"
+    title="JobPulse AI",
+    lifespan=lifespan
 )
 
 
@@ -29,7 +47,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://ai-job-alert-platform.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -67,13 +87,3 @@ def health():
     return {
         "status": "healthy"
     }
-
-
-# =========================
-# START SCHEDULER
-# =========================
-
-@app.on_event("startup")
-def startup_event():
-
-    start_scheduler()
