@@ -45,7 +45,8 @@ def admin_login(data: dict):
     ):
 
         return {
-            "access_token": "admin_token"
+            "access_token": "admin_token",
+            "token_type": "bearer"
         }
 
     raise HTTPException(
@@ -62,7 +63,7 @@ def verify_admin(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
 
-    token = credentials.credentials
+    token = credentials.credentials.strip()
 
     if token != "admin_token":
 
