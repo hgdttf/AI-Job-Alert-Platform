@@ -33,6 +33,7 @@ def register_user(
     db: Session = Depends(get_db)
 ):
 
+    # Check if user already exists
     existing_user = db.query(User).filter(
         User.email == user.email
     ).first()
@@ -44,6 +45,7 @@ def register_user(
             detail="Email already registered"
         )
 
+    # Create new user
     new_user = User(
         email=user.email,
         categories=",".join(user.categories),
@@ -57,7 +59,13 @@ def register_user(
     db.refresh(new_user)
 
     return {
-        "message": "User registered successfully"
+        "message": "User registered successfully",
+        "user": {
+            "id": new_user.id,
+            "email": new_user.email,
+            "categories": new_user.categories,
+            "delivery_time": new_user.delivery_time
+        }
     }
 
 
@@ -72,4 +80,15 @@ def get_users(
 
     users = db.query(User).all()
 
-    return users
+    result = []
+
+    for user in users:
+
+        result.append({
+            "id": user.id,
+            "email": user.email,
+            "categories": user.categories,
+            "delivery_time": user.delivery_time
+        })
+
+    return result
