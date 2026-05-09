@@ -1,151 +1,167 @@
 import os
-import smtplib
+import requests
 
 from dotenv import load_dotenv
 
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-
-
-# =========================
-# LOAD ENV VARIABLES
-# =========================
-
 load_dotenv()
 
-EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 
-
-# =========================
-# SEND JOB EMAIL
-# =========================
 
 def send_job_email(receiver_email, jobs):
 
-    try:
+    if not RESEND_API_KEY:
 
-        # Prevent empty emails
-        if not jobs or len(jobs) == 0:
+        print("RESEND_API_KEY missing")
 
-            print("No jobs found. Email skipped.")
+        return False
 
-            return
+    if len(jobs) == 0:
 
-        html_jobs = ""
+        print("No jobs found.")
 
-        for job in jobs[:15]:
+        return False
 
-            html_jobs += f"""
-            <div style="
-                padding:20px;
-                margin-bottom:20px;
-                border-radius:12px;
-                background:#0f172a;
-                border:1px solid #1e293b;
-            ">
+    html_jobs = ""
 
-                <h2 style="
-                    color:#38bdf8;
-                    margin-bottom:10px;
-                ">
-                    {job.get('title', 'Unknown Title')}
-                </h2>
+    for job in jobs[:15]:
 
-                <p style="color:white;">
-                    <strong>Company:</strong>
-                    {job.get('company', 'Unknown')}
-                </p>
-
-                <p style="color:white;">
-                    <strong>Category:</strong>
-                    {job.get('category', 'General')}
-                </p>
-
-                <a
-                    href="{job.get('link', '#')}"
-                    style="
-                        color:#22c55e;
-                        text-decoration:none;
-                        font-weight:bold;
-                    "
-                >
-                    Apply Here →
-                </a>
-
-            </div>
-            """
-
-        html = f"""
-        <html>
-
-        <body style="
-            background:#020617;
-            color:white;
-            font-family:Arial, sans-serif;
-            padding:30px;
+        html_jobs += f"""
+        <div style="
+            background:#0f172a;
+            padding:20px;
+            border-radius:12px;
+            margin-bottom:20px;
+            border:1px solid #1e293b;
         ">
 
-            <div style="
-                max-width:700px;
-                margin:auto;
+            <h2 style="
+                color:#38bdf8;
+                margin-bottom:10px;
             ">
+                {job['title']}
+            </h2>
 
-                <h1 style="
-                    color:#38bdf8;
-                    margin-bottom:10px;
-                ">
-                    JobPulse AI
-                </h1>
+            <p style="color:white;">
+                <strong>Company:</strong>
+                {job['company']}
+            </p>
 
-                <p style="
-                    color:#cbd5e1;
-                    margin-bottom:30px;
-                ">
-                    Latest curated opportunities for you.
-                </p>
+            <p style="color:white;">
+                <strong>Category:</strong>
+                {job['category']}
+            </p>
 
-                {html_jobs}
+            <a
+                href="{job['link']}"
+                style="
+                    display:inline-block;
+                    margin-top:12px;
+                    padding:10px 18px;
+                    background:#2563eb;
+                    color:white;
+                    text-decoration:none;
+                    border-radius:8px;
+                    font-weight:bold;
+                "
+            >
+                Apply Now
+            </a>
 
-            </div>
-
-        </body>
-
-        </html>
+        </div>
         """
 
-        message = MIMEMultipart("alternative")
+    html = f"""
+    <html>
 
-        message["Subject"] = "JobPulse AI - Fresh Opportunities"
+    <body style="
+        background:#020617;
+        color:white;
+        font-family:Arial,sans-serif;
+        padding:30px;
+    ">
 
-        message["From"] = EMAIL_ADDRESS
+        <div style="
+            max-width:700px;
+            margin:auto;
+        ">
 
-        message["To"] = receiver_email
+            <h1 style="
+                color:#38bdf8;
+                font-size:32px;
+            ">
+                JobPulse AI
+            </h1>
 
-        message.attach(
-            MIMEText(html, "html")
+            <p style="
+                color:#cbd5e1;
+                font-size:16px;
+                margin-bottom:30px;
+            ">
+                Fresh curated opportunities matching your interests.
+            </p>
+
+            {html_jobs}
+
+            <hr style="
+                border:none;
+                border-top:1px solid #1e293b;
+                margin:30px 0;
+            ">
+
+            <p style="
+                color:#64748b;
+                font-size:14px;
+            ">
+                Powered by JobPulse AI
+            </p>
+
+        </div>
+
+    </body>
+
+    </html>
+    """
+
+    payload = {
+        "from": "JobPulse AI <onboarding@resend.dev>",
+        "to": [receiver_email],
+        "subject": "JobPulse AI - Fresh Opportunities",
+        "html": html
+    }
+
+    headers = {
+        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+
+        response = requests.post(
+            "https://api.resend.com/emails",
+            json=payload,
+            headers=headers,
+            timeout=30
         )
 
-        with smtplib.SMTP(
-            "smtp.gmail.com",
-            587
-        ) as server:
+        print("EMAIL STATUS:", response.status_code)
 
-            server.starttls()
+        print("EMAIL RESPONSE:", response.text)
 
-            server.login(
-                EMAIL_ADDRESS,
-                EMAIL_PASSWORD
-            )
+        if response.status_code in [200, 201]:
 
-            server.sendmail(
-                EMAIL_ADDRESS,
-                receiver_email,
-                message.as_string()
-            )
+            print(f"Email sent to {receiver_email}")
 
-        print(f"Email sent successfully to {receiver_email}")
+            return True
+
+        else:
+
+            print("Email sending failed")
+
+            return False
 
     except Exception as e:
 
-        print(f"Email sending failed: {str(e)}")
+        print("Email service error:", e)
+
+        return False
