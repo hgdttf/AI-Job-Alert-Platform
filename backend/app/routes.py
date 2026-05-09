@@ -1,31 +1,45 @@
 from datetime import datetime
 
 from fastapi import APIRouter
-from fastapi import Depends
 from fastapi import HTTPException
+from fastapi import Depends
 
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-from .email_service import send_job_email
+
 from .models import User
-from .pipeline import get_jobs_for_categories
+
 from .schemas import UserCreate
+
+from .pipeline import get_jobs_for_categories
+
+from .email_service import send_job_email
 
 
 router = APIRouter()
 
+
+# =========================
+# DATABASE
+# =========================
 
 def get_db():
 
     db = SessionLocal()
 
     try:
+
         yield db
 
     finally:
+
         db.close()
 
+
+# =========================
+# REGISTER USER
+# =========================
 
 @router.post("/register")
 def register_user(
@@ -33,13 +47,35 @@ def register_user(
     db: Session = Depends(get_db)
 ):
 
+    clean_email = user.email.strip().lower()
+
+    # =========================
+    # PREVENT INVALID EMAILS
+    # =========================
+
+    if "@gmail.com@gmail.com" in clean_email:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid email format"
+        )
+
+    # =========================
+    # CHECK EXISTING USER
+    # =========================
+
     existing_user = db.query(User).filter(
-        User.email == user.email
+        User.email == clean_email
     ).first()
+
+    # =========================
+    # UPDATE EXISTING USER
+    # =========================
 
     if existing_user:
 
         existing_user.categories = ",".join(user.categories)
+
         existing_user.delivery_time = user.delivery_time
 
         db.commit()
@@ -48,8 +84,12 @@ def register_user(
             "message": "User updated successfully"
         }
 
+    # =========================
+    # CREATE NEW USER
+    # =========================
+
     new_user = User(
-        email=user.email,
+        email=clean_email,
         categories=",".join(user.categories),
         delivery_time=user.delivery_time,
         first_email_sent=False,
@@ -62,6 +102,10 @@ def register_user(
 
     db.refresh(new_user)
 
+    # =========================
+    # FETCH JOBS
+    # =========================
+
     categories = [
         c.strip()
         for c in new_user.categories.split(",")
@@ -69,24 +113,38 @@ def register_user(
 
     jobs = get_jobs_for_categories(categories)
 
-    email_sent = send_job_email(
-        new_user.email,
-        jobs
-    )
+    print(f"Fetched jobs: {len(jobs)}")
 
-    if email_sent:
+    # =========================
+    # SEND FIRST EMAIL
+    # =========================
 
-        new_user.first_email_sent = True
+    email_sent = False
 
-        new_user.last_email_sent_date = datetime.now().date()
+    if jobs and len(jobs) > 0:
 
-        db.commit()
+        email_sent = send_job_email(
+            new_user.email,
+            jobs
+        )
+
+        if email_sent:
+
+            new_user.first_email_sent = True
+
+            new_user.last_email_sent_date = datetime.now().date()
+
+            db.commit()
 
     return {
         "message": "User registered successfully",
         "email_sent": email_sent
     }
 
+
+# =========================
+# GET USERS
+# =========================
 
 @router.get("/users")
 def get_users(

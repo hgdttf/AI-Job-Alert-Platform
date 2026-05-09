@@ -3,19 +3,33 @@ import requests
 
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
-RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 
-FROM_EMAIL = os.getenv("FROM_EMAIL")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 
 
 def send_job_email(receiver_email, jobs):
 
+    # =========================
+    # VALIDATIONS
+    # =========================
+
+    if not receiver_email:
+        print("No receiver email provided")
+        return False
+
+    if "@gmail.com@gmail.com" in receiver_email:
+        print("Invalid duplicated gmail detected")
+        return False
+
     if not jobs:
         print("No jobs found")
         return False
+
+    # =========================
+    # BUILD HTML
+    # =========================
 
     html_jobs = ""
 
@@ -91,8 +105,12 @@ def send_job_email(receiver_email, jobs):
     </html>
     """
 
+    # =========================
+    # RESEND PAYLOAD
+    # =========================
+
     payload = {
-        "from": f"JobPulse AI <{FROM_EMAIL}>",
+        "from": "JobPulse AI <alerts@jobpulse.xyz>",
         "to": [receiver_email],
         "subject": "JobPulse AI - Fresh Opportunities",
         "html": html
@@ -103,6 +121,10 @@ def send_job_email(receiver_email, jobs):
         "Content-Type": "application/json"
     }
 
+    # =========================
+    # SEND EMAIL
+    # =========================
+
     try:
 
         response = requests.post(
@@ -112,12 +134,15 @@ def send_job_email(receiver_email, jobs):
             timeout=30
         )
 
+        print("========== RESEND DEBUG ==========")
         print("STATUS:", response.status_code)
-        print("BODY:", response.text)
+        print("RESPONSE:", response.text)
+        print("EMAIL:", receiver_email)
+        print("==================================")
 
         response.raise_for_status()
 
-        print(f"Email sent to {receiver_email}")
+        print(f"Email sent successfully to {receiver_email}")
 
         return True
 
