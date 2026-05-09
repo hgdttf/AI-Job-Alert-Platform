@@ -1,8 +1,6 @@
-aiosqlite==0.22.1
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.13.0
-APScheduler==3.11.2
 beautifulsoup4==4.14.3
 certifi==2026.4.22
 charset-normalizer==3.4.7
@@ -29,3 +27,4 @@ tzdata==2026.2
 tzlocal==5.3.1
 urllib3==2.7.0
 uvicorn==0.46.0
+psycopg2-binary==2.9.10

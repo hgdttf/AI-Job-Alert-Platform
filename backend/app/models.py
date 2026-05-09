@@ -2,6 +2,7 @@ from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import Boolean
+from sqlalchemy import Date
 
 from .database import Base
 
@@ -19,16 +20,19 @@ class User(Base):
     email = Column(
         String,
         unique=True,
+        nullable=False,
         index=True
     )
 
-    categories = Column(String)
+    categories = Column(
+        String,
+        nullable=False
+    )
 
-    delivery_time = Column(String)
-
-    # =========================
-    # EMAIL TRACKING
-    # =========================
+    delivery_time = Column(
+        String,
+        nullable=False
+    )
 
     first_email_sent = Column(
         Boolean,
@@ -36,6 +40,6 @@ class User(Base):
     )
 
     last_email_sent_date = Column(
-        String,
+        Date,
         nullable=True
     )
