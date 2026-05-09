@@ -1,8 +1,8 @@
-from sqlalchemy import Boolean
 from sqlalchemy import Column
-from sqlalchemy import Date
 from sqlalchemy import Integer
 from sqlalchemy import String
+from sqlalchemy import Boolean
+from sqlalchemy import Date
 
 from .database import Base
 
