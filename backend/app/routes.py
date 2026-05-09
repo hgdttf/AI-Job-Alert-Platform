@@ -1,39 +1,31 @@
+from datetime import datetime
+
 from fastapi import APIRouter
-from fastapi import HTTPException
 from fastapi import Depends
+from fastapi import HTTPException
 
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-
+from .email_service import send_job_email
 from .models import User
-
+from .pipeline import get_jobs_for_categories
 from .schemas import UserCreate
 
 
 router = APIRouter()
 
 
-# =========================
-# DATABASE SESSION
-# =========================
-
 def get_db():
 
     db = SessionLocal()
 
     try:
-
         yield db
 
     finally:
-
         db.close()
 
-
-# =========================
-# REGISTER OR UPDATE USER
-# =========================
 
 @router.post("/register")
 def register_user(
@@ -41,54 +33,20 @@ def register_user(
     db: Session = Depends(get_db)
 ):
 
-    print("\n========== REGISTER ENDPOINT HIT ==========")
-
-    print("Incoming email:", user.email)
-    print("Incoming categories:", user.categories)
-    print("Incoming delivery time:", user.delivery_time)
-
     existing_user = db.query(User).filter(
         User.email == user.email
     ).first()
 
-    # =========================
-    # UPDATE EXISTING USER
-    # =========================
-
     if existing_user:
 
-        print("Existing user found.")
-
-        existing_user.categories = ",".join(
-            user.categories
-        )
-
-        existing_user.delivery_time = (
-            user.delivery_time
-        )
-
-        # reset tracking
-        existing_user.first_email_sent = False
-
-        existing_user.last_email_sent_date = None
+        existing_user.categories = ",".join(user.categories)
+        existing_user.delivery_time = user.delivery_time
 
         db.commit()
 
-        db.refresh(existing_user)
-
-        print("User updated successfully.")
-
         return {
-            "message": (
-                "User preferences updated successfully"
-            )
+            "message": "User updated successfully"
         }
-
-    # =========================
-    # CREATE NEW USER
-    # =========================
-
-    print("Creating new user.")
 
     new_user = User(
         email=user.email,
@@ -104,16 +62,31 @@ def register_user(
 
     db.refresh(new_user)
 
-    print("New user created successfully.")
+    categories = [
+        c.strip()
+        for c in new_user.categories.split(",")
+    ]
+
+    jobs = get_jobs_for_categories(categories)
+
+    email_sent = send_job_email(
+        new_user.email,
+        jobs
+    )
+
+    if email_sent:
+
+        new_user.first_email_sent = True
+
+        new_user.last_email_sent_date = datetime.now().date()
+
+        db.commit()
 
     return {
-        "message": "User registered successfully"
+        "message": "User registered successfully",
+        "email_sent": email_sent
     }
 
-
-# =========================
-# GET USERS
-# =========================
 
 @router.get("/users")
 def get_users(
