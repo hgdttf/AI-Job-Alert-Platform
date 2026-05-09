@@ -1,18 +1,14 @@
-from datetime import date
-from threading import Thread
-
 from fastapi import APIRouter
-from fastapi import Depends
 from fastapi import HTTPException
+from fastapi import Depends
 
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-from .models import User
-from .schemas import UserCreate
 
-from .pipeline import get_jobs_for_categories
-from .email_service import send_job_email
+from .models import User
+
+from .schemas import UserCreate
 
 
 router = APIRouter()
@@ -36,73 +32,7 @@ def get_db():
 
 
 # =========================
-# BACKGROUND EMAIL TASK
-# =========================
-
-def send_initial_email_background(
-    email: str,
-    categories: list,
-    user_id: int
-):
-
-    db = SessionLocal()
-
-    try:
-
-        print(f"Fetching jobs for {email}")
-
-        jobs = get_jobs_for_categories(categories)
-
-        print(f"Jobs fetched: {len(jobs)}")
-
-        if jobs and len(jobs) > 0:
-
-            email_sent = send_job_email(
-                email,
-                jobs
-            )
-
-            if email_sent:
-
-                user = db.query(User).filter(
-                    User.id == user_id
-                ).first()
-
-                if user:
-
-                    user.first_email_sent = True
-
-                    user.last_email_sent_date = date.today()
-
-                    db.commit()
-
-                    print(
-                        f"Initial email sent to {email}"
-                    )
-
-            else:
-
-                print(
-                    f"Email sending failed for {email}"
-                )
-
-        else:
-
-            print(f"No jobs found for {email}")
-
-    except Exception as e:
-
-        print(
-            f"Background email error: {str(e)}"
-        )
-
-    finally:
-
-        db.close()
-
-
-# =========================
-# REGISTER / UPDATE USER
+# REGISTER OR UPDATE USER
 # =========================
 
 @router.post("/register")
@@ -111,100 +41,74 @@ def register_user(
     db: Session = Depends(get_db)
 ):
 
-    try:
+    print("\n========== REGISTER ENDPOINT HIT ==========")
 
-        existing_user = db.query(User).filter(
-            User.email == user.email
-        ).first()
+    print("Incoming email:", user.email)
+    print("Incoming categories:", user.categories)
+    print("Incoming delivery time:", user.delivery_time)
 
-        categories_string = ",".join(user.categories)
+    existing_user = db.query(User).filter(
+        User.email == user.email
+    ).first()
 
-        # =========================
-        # UPDATE EXISTING USER
-        # =========================
+    # =========================
+    # UPDATE EXISTING USER
+    # =========================
 
-        if existing_user:
+    if existing_user:
 
-            existing_user.categories = (
-                categories_string
-            )
+        print("Existing user found.")
 
-            existing_user.delivery_time = (
-                user.delivery_time
-            )
-
-            db.commit()
-
-            db.refresh(existing_user)
-
-            print(
-                f"Updated existing user: "
-                f"{existing_user.email}"
-            )
-
-            return {
-                "message": (
-                    "User preferences updated"
-                )
-            }
-
-        # =========================
-        # CREATE NEW USER
-        # =========================
-
-        new_user = User(
-            email=user.email,
-            categories=categories_string,
-            delivery_time=user.delivery_time,
-            first_email_sent=False,
-            last_email_sent_date=None
+        existing_user.categories = ",".join(
+            user.categories
         )
 
-        db.add(new_user)
+        existing_user.delivery_time = (
+            user.delivery_time
+        )
+
+        # reset tracking
+        existing_user.first_email_sent = False
+
+        existing_user.last_email_sent_date = None
 
         db.commit()
 
-        db.refresh(new_user)
+        db.refresh(existing_user)
 
-        print(
-            f"New user registered: "
-            f"{new_user.email}"
-        )
-
-        # =========================
-        # BACKGROUND EMAIL THREAD
-        # =========================
-
-        categories_list = [
-            c.strip()
-            for c in categories_string.split(",")
-        ]
-
-        Thread(
-            target=send_initial_email_background,
-            args=(
-                new_user.email,
-                categories_list,
-                new_user.id
-            )
-        ).start()
+        print("User updated successfully.")
 
         return {
             "message": (
-                "User registered successfully"
+                "User preferences updated successfully"
             )
         }
 
-    except Exception as e:
+    # =========================
+    # CREATE NEW USER
+    # =========================
 
-        db.rollback()
+    print("Creating new user.")
 
-        print(f"Register route error: {str(e)}")
+    new_user = User(
+        email=user.email,
+        categories=",".join(user.categories),
+        delivery_time=user.delivery_time,
+        first_email_sent=False,
+        last_email_sent_date=None
+    )
 
-        raise HTTPException(
-            status_code=500,
-            detail="Registration failed"
-        )
+    db.add(new_user)
+
+    db.commit()
+
+    db.refresh(new_user)
+
+    print("New user created successfully.")
+
+    return {
+        "message": "User registered successfully"
+    }
 
 
 # =========================
