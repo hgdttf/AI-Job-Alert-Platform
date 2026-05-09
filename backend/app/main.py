@@ -3,6 +3,7 @@ from datetime import date
 from fastapi import FastAPI
 from fastapi import Depends
 from fastapi import HTTPException
+from fastapi import BackgroundTasks
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -93,12 +94,42 @@ def get_users(
 
 
 # =========================================
+# BACKGROUND EMAIL TASK
+# =========================================
+
+def process_and_send_email(user_email, categories):
+
+    try:
+
+        jobs = get_jobs_for_categories(categories)
+
+        print(f"Jobs fetched: {len(jobs)}")
+
+        if jobs and len(jobs) > 0:
+
+            send_job_email(
+                receiver_email=user_email,
+                jobs=jobs
+            )
+
+            print(
+                f"Email sent successfully to "
+                f"{user_email}"
+            )
+
+    except Exception as e:
+
+        print("BACKGROUND EMAIL ERROR:", str(e))
+
+
+# =========================================
 # REGISTER USER
 # =========================================
 
 @app.post("/register")
 def register_user(
     user: UserCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
 
@@ -115,9 +146,11 @@ def register_user(
     if existing_user:
 
         existing_user.categories = categories_string
+
         existing_user.delivery_time = user.delivery_time
 
         db.commit()
+
         db.refresh(existing_user)
 
         target_user = existing_user
@@ -145,68 +178,31 @@ def register_user(
         target_user = new_user
 
     # =====================================
-    # FETCH JOBS
+    # BACKGROUND EMAIL
     # =====================================
 
-    try:
+    category_list = [
+        c.strip()
+        for c in target_user.categories.split(",")
+        if c.strip()
+    ]
 
-        category_list = [
-            c.strip()
-            for c in target_user.categories.split(",")
-            if c.strip()
-        ]
+    background_tasks.add_task(
+        process_and_send_email,
+        target_user.email,
+        category_list
+    )
 
-        jobs = get_jobs_for_categories(
-            category_list
-        )
+    target_user.first_email_sent = True
 
-        print(f"Jobs fetched: {len(jobs)}")
+    target_user.last_email_sent_date = date.today()
 
-    except Exception as e:
-
-        print("JOB FETCH ERROR:", str(e))
-
-        jobs = []
+    db.commit()
 
     # =====================================
-    # SEND EMAIL
+    # INSTANT RESPONSE
     # =====================================
 
-    try:
-
-        if jobs and len(jobs) > 0:
-
-            send_job_email(
-                receiver_email=target_user.email,
-                jobs=jobs
-            )
-
-            target_user.first_email_sent = True
-
-            target_user.last_email_sent_date = date.today()
-
-            db.commit()
-
-            print(
-                f"Email sent successfully to "
-                f"{target_user.email}"
-            )
-
-            return {
-                "message": "User registered and email sent successfully"
-            }
-
-        else:
-
-            return {
-                "message": "User registered but no jobs found"
-            }
-
-    except Exception as e:
-
-        print("EMAIL ERROR:", str(e))
-
-        raise HTTPException(
-            status_code=500,
-            detail=f"Email sending failed: {str(e)}"
-        )
+    return {
+        "message": "Alerts activated successfully"
+    }
