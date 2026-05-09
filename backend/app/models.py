@@ -27,7 +27,7 @@ class User(Base):
     delivery_time = Column(String)
 
     # =========================
-    # NEW PRODUCTION FIELDS
+    # EMAIL TRACKING
     # =========================
 
     first_email_sent = Column(
