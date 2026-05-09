@@ -1,9 +1,11 @@
 from datetime import datetime
 from datetime import date
 
+import pytz
+
 from fastapi import FastAPI
 from fastapi import Depends
-from fastapi import BackgroundTasks
+from fastapi import HTTPException
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -18,7 +20,7 @@ from .email_service import send_job_email
 
 
 # =========================================
-# FASTAPI APP
+# FASTAPI
 # =========================================
 
 app = FastAPI()
@@ -32,8 +34,6 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://ai-job-alert-platform.vercel.app",
-        "https://jobpulse.xyz",
-        "https://www.jobpulse.xyz",
         "http://localhost:3000",
     ],
     allow_credentials=True,
@@ -51,9 +51,11 @@ def get_db():
     db = SessionLocal()
 
     try:
+
         yield db
 
     finally:
+
         db.close()
 
 
@@ -82,7 +84,7 @@ def health():
 
 
 # =========================================
-# USERS
+# GET USERS
 # =========================================
 
 @app.get("/users")
@@ -96,128 +98,142 @@ def get_users(
 
 
 # =========================================
-# BACKGROUND EMAIL TASK
-# =========================================
-
-def process_and_send_email(
-    user_email,
-    categories
-):
-
-    try:
-
-        jobs = get_jobs_for_categories(
-            categories
-        )
-
-        print(f"Jobs fetched: {len(jobs)}")
-
-        if jobs and len(jobs) > 0:
-
-            send_job_email(
-                receiver_email=user_email,
-                jobs=jobs
-            )
-
-            print(
-                f"Email sent successfully to "
-                f"{user_email}"
-            )
-
-    except Exception as e:
-
-        print(
-            "BACKGROUND EMAIL ERROR:",
-            str(e)
-        )
-
-
-# =========================================
 # REGISTER USER
 # =========================================
 
 @app.post("/register")
 def register_user(
     user: UserCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
 
-    existing_user = db.query(User).filter(
-        User.email == user.email
-    ).first()
+    try:
 
-    categories_string = ",".join(
-        user.categories
-    )
+        existing_user = db.query(User).filter(
+            User.email == user.email
+        ).first()
 
-    # =====================================
-    # UPDATE USER
-    # =====================================
-
-    if existing_user:
-
-        existing_user.categories = (
-            categories_string
+        categories_string = ",".join(
+            user.categories
         )
 
-        existing_user.delivery_time = (
-            user.delivery_time
+        # =====================================
+        # UPDATE EXISTING USER
+        # =====================================
+
+        if existing_user:
+
+            existing_user.categories = (
+                categories_string
+            )
+
+            existing_user.delivery_time = (
+                user.delivery_time
+            )
+
+            db.commit()
+
+            db.refresh(existing_user)
+
+            target_user = existing_user
+
+            print(
+                f"Updated existing user: "
+                f"{target_user.email}"
+            )
+
+        # =====================================
+        # CREATE NEW USER
+        # =====================================
+
+        else:
+
+            new_user = User(
+                email=user.email,
+                categories=categories_string,
+                delivery_time=user.delivery_time,
+                first_email_sent=False,
+                last_email_sent_date=None
+            )
+
+            db.add(new_user)
+
+            db.commit()
+
+            db.refresh(new_user)
+
+            target_user = new_user
+
+            print(
+                f"Created new user: "
+                f"{target_user.email}"
+            )
+
+        # =====================================
+        # FETCH JOBS
+        # =====================================
+
+        category_list = [
+            c.strip()
+            for c in target_user.categories.split(",")
+            if c.strip()
+        ]
+
+        jobs = get_jobs_for_categories(
+            category_list
         )
 
-        db.commit()
-
-        db.refresh(existing_user)
-
-        target_user = existing_user
-
-    # =====================================
-    # CREATE USER
-    # =====================================
-
-    else:
-
-        new_user = User(
-            email=user.email,
-            categories=categories_string,
-            delivery_time=user.delivery_time,
-            first_email_sent=False,
-            last_email_sent_date=None
+        print(
+            f"Jobs fetched: {len(jobs)}"
         )
 
-        db.add(new_user)
+        # =====================================
+        # SEND EMAIL
+        # =====================================
 
-        db.commit()
+        if jobs and len(jobs) > 0:
 
-        db.refresh(new_user)
+            send_job_email(
+                receiver_email=target_user.email,
+                jobs=jobs
+            )
 
-        target_user = new_user
+            target_user.first_email_sent = True
 
-    # =====================================
-    # BACKGROUND EMAIL
-    # =====================================
+            target_user.last_email_sent_date = (
+                date.today()
+            )
 
-    category_list = [
-        c.strip()
-        for c in target_user.categories.split(",")
-        if c.strip()
-    ]
+            db.commit()
 
-    background_tasks.add_task(
-        process_and_send_email,
-        target_user.email,
-        category_list
-    )
+            print(
+                f"Initial email sent to "
+                f"{target_user.email}"
+            )
 
-    target_user.first_email_sent = True
+            return {
+                "message":
+                "User registered successfully and email sent"
+            }
 
-    target_user.last_email_sent_date = date.today()
+        else:
 
-    db.commit()
+            return {
+                "message":
+                "User registered but no jobs found"
+            }
 
-    return {
-        "message": "Alerts activated successfully"
-    }
+    except Exception as e:
+
+        print(
+            "REGISTER ERROR:",
+            str(e)
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 
 # =========================================
@@ -226,75 +242,102 @@ def register_user(
 
 @app.get("/run-job-check")
 def run_job_check(
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
 
-    users = db.query(User).all()
+    try:
 
-    current_time = datetime.now().strftime(
-        "%I:%M %p"
-    )
+        # =====================================
+        # INDIA TIMEZONE
+        # =====================================
 
-    print(
-        f"Running scheduled job check "
-        f"at {current_time}"
-    )
-
-    total_processed = 0
-
-    for user in users:
-
-        # =================================
-        # TIME MATCH
-        # =================================
-
-        if user.delivery_time != current_time:
-            continue
-
-        # =================================
-        # DUPLICATE PREVENTION
-        # =================================
-
-        if (
-            user.last_email_sent_date
-            == date.today()
-        ):
-
-            print(
-                f"Already sent today: "
-                f"{user.email}"
-            )
-
-            continue
-
-        category_list = [
-            c.strip()
-            for c in user.categories.split(",")
-            if c.strip()
-        ]
-
-        background_tasks.add_task(
-            process_and_send_email,
-            user.email,
-            category_list
+        india_timezone = pytz.timezone(
+            "Asia/Kolkata"
         )
 
-        user.last_email_sent_date = (
-            date.today()
-        )
-
-        db.commit()
-
-        total_processed += 1
+        current_time = datetime.now(
+            india_timezone
+        ).strftime("%I:%M %p")
 
         print(
-            f"Scheduled email queued for "
-            f"{user.email}"
+            f"Current IST Time: "
+            f"{current_time}"
         )
 
-    return {
-        "message": "Scheduled check completed",
-        "processed_users": total_processed,
-        "current_time": current_time
-    }
+        users = db.query(User).all()
+
+        processed_users = 0
+
+        for user in users:
+
+            print(
+                f"Checking {user.email} "
+                f"scheduled for "
+                f"{user.delivery_time}"
+            )
+
+            # =================================
+            # MATCH TIME
+            # =================================
+
+            if user.delivery_time == current_time:
+
+                categories = [
+                    c.strip()
+                    for c in user.categories.split(",")
+                    if c.strip()
+                ]
+
+                jobs = get_jobs_for_categories(
+                    categories
+                )
+
+                print(
+                    f"Jobs for {user.email}: "
+                    f"{len(jobs)}"
+                )
+
+                if jobs and len(jobs) > 0:
+
+                    send_job_email(
+                        receiver_email=user.email,
+                        jobs=jobs
+                    )
+
+                    user.first_email_sent = True
+
+                    user.last_email_sent_date = (
+                        datetime.now(
+                            india_timezone
+                        ).date()
+                    )
+
+                    db.commit()
+
+                    processed_users += 1
+
+                    print(
+                        f"Scheduled email sent to "
+                        f"{user.email}"
+                    )
+
+        return {
+            "message":
+            "Scheduled check completed",
+            "processed_users":
+            processed_users,
+            "current_time_ist":
+            current_time
+        }
+
+    except Exception as e:
+
+        print(
+            "SCHEDULER ERROR:",
+            str(e)
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
