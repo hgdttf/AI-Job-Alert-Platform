@@ -16,7 +16,12 @@ from .pipeline import get_jobs_for_categories
 from .email_service import send_job_email
 
 
+# =========================================
+# FASTAPI APP
+# =========================================
+
 app = FastAPI()
+
 
 # =========================================
 # CORS
@@ -32,6 +37,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # =========================================
 # DATABASE
@@ -109,11 +115,9 @@ def register_user(
     if existing_user:
 
         existing_user.categories = categories_string
-
         existing_user.delivery_time = user.delivery_time
 
         db.commit()
-
         db.refresh(existing_user)
 
         target_user = existing_user
