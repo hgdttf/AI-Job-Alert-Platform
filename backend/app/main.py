@@ -1,22 +1,26 @@
-from fastapi import FastAPI, Depends, HTTPException
+from datetime import date
+
+from fastapi import FastAPI
+from fastapi import Depends
+from fastapi import HTTPException
+
 from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy.orm import Session
 
-from backend.app.database import SessionLocal
-from backend.app.models import User
-from backend.app.schemas import UserCreate
+from .database import SessionLocal
+from .models import User
+from .schemas import UserCreate
 
-from backend.app.services.email_service import send_job_email
-from backend.app.services.job_service import get_jobs_for_categories
+from .pipeline import get_jobs_for_categories
+from .email_service import send_job_email
 
-from datetime import date
 
 app = FastAPI()
 
-# -----------------------------
+# =========================================
 # CORS
-# -----------------------------
+# =========================================
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,85 +33,94 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -----------------------------
+# =========================================
 # DATABASE
-# -----------------------------
+# =========================================
 
 def get_db():
+
     db = SessionLocal()
+
     try:
         yield db
+
     finally:
         db.close()
 
-# -----------------------------
+
+# =========================================
 # ROOT
-# -----------------------------
+# =========================================
 
 @app.get("/")
 def root():
-    return {"message": "JobPulse Backend Running"}
 
-# -----------------------------
+    return {
+        "message": "JobPulse Backend Running"
+    }
+
+
+# =========================================
 # HEALTH
-# -----------------------------
+# =========================================
 
 @app.get("/health")
 def health():
-    return {"status": "healthy"}
 
-# -----------------------------
-# USERS
-# -----------------------------
+    return {
+        "status": "healthy"
+    }
+
+
+# =========================================
+# GET USERS
+# =========================================
 
 @app.get("/users")
-def get_users(db: Session = Depends(get_db)):
+def get_users(
+    db: Session = Depends(get_db)
+):
+
     users = db.query(User).all()
 
-    return [
-        {
-            "id": user.id,
-            "email": user.email,
-            "categories": user.categories,
-            "delivery_time": user.delivery_time,
-            "first_email_sent": user.first_email_sent,
-            "last_email_sent_date": user.last_email_sent_date,
-        }
-        for user in users
-    ]
+    return users
 
-# -----------------------------
-# REGISTER
-# -----------------------------
+
+# =========================================
+# REGISTER USER
+# =========================================
 
 @app.post("/register")
-def register_user(user: UserCreate, db: Session = Depends(get_db)):
+def register_user(
+    user: UserCreate,
+    db: Session = Depends(get_db)
+):
 
-    existing_user = (
-        db.query(User)
-        .filter(User.email == user.email)
-        .first()
-    )
+    existing_user = db.query(User).filter(
+        User.email == user.email
+    ).first()
 
     categories_string = ",".join(user.categories)
 
-    # ---------------------------------
+    # =====================================
     # UPDATE EXISTING USER
-    # ---------------------------------
+    # =====================================
 
     if existing_user:
 
         existing_user.categories = categories_string
+
         existing_user.delivery_time = user.delivery_time
 
         db.commit()
+
         db.refresh(existing_user)
 
         target_user = existing_user
 
-    # ---------------------------------
+    # =====================================
     # CREATE NEW USER
-    # ---------------------------------
+    # =====================================
 
     else:
 
@@ -116,18 +129,20 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
             categories=categories_string,
             delivery_time=user.delivery_time,
             first_email_sent=False,
-            last_email_sent_date=None,
+            last_email_sent_date=None
         )
 
         db.add(new_user)
+
         db.commit()
+
         db.refresh(new_user)
 
         target_user = new_user
 
-    # ---------------------------------
+    # =====================================
     # FETCH JOBS
-    # ---------------------------------
+    # =====================================
 
     try:
 
@@ -137,22 +152,25 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
             if c.strip()
         ]
 
-        jobs = get_jobs_for_categories(category_list)
+        jobs = get_jobs_for_categories(
+            category_list
+        )
 
-        print("JOBS FOUND:", len(jobs))
+        print(f"Jobs fetched: {len(jobs)}")
 
     except Exception as e:
 
         print("JOB FETCH ERROR:", str(e))
+
         jobs = []
 
-    # ---------------------------------
+    # =====================================
     # SEND EMAIL
-    # ---------------------------------
+    # =====================================
 
     try:
 
-        if jobs:
+        if jobs and len(jobs) > 0:
 
             send_job_email(
                 receiver_email=target_user.email,
@@ -160,9 +178,15 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
             )
 
             target_user.first_email_sent = True
-            target_user.last_email_sent_date = str(date.today())
+
+            target_user.last_email_sent_date = date.today()
 
             db.commit()
+
+            print(
+                f"Email sent successfully to "
+                f"{target_user.email}"
+            )
 
             return {
                 "message": "User registered and email sent successfully"
@@ -176,7 +200,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
     except Exception as e:
 
-        print("EMAIL SEND ERROR:", str(e))
+        print("EMAIL ERROR:", str(e))
 
         raise HTTPException(
             status_code=500,
