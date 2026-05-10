@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter
 from fastapi import HTTPException
 from fastapi import Depends
@@ -5,16 +7,22 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
+
 from .models import User
+
 from .schemas import UserCreate
 
-from .instant_email import (
-    send_instant_email
-)
+from .pipeline import get_jobs_for_categories
+
+from .email_service import send_job_email
 
 
 router = APIRouter()
 
+
+# =========================================
+# DATABASE SESSION
+# =========================================
 
 def get_db():
 
@@ -27,18 +35,26 @@ def get_db():
         db.close()
 
 
+# =========================================
+# REGISTER / UPDATE USER
+# =========================================
+
 @router.post("/register")
 def register_user(
     user: UserCreate,
     db: Session = Depends(get_db)
 ):
 
+    # =====================================
+    # CHECK IF USER EXISTS
+    # =====================================
+
     existing_user = db.query(User).filter(
         User.email == user.email
     ).first()
 
     # =====================================
-    # UPDATE EXISTING USER
+    # EXISTING USER FLOW
     # =====================================
 
     if existing_user:
@@ -55,17 +71,49 @@ def register_user(
 
         db.refresh(existing_user)
 
-        send_instant_email(
-            existing_user,
-            db
+        categories = [
+            c.strip()
+            for c in existing_user.categories.split(",")
+        ]
+
+        jobs = get_jobs_for_categories(
+            categories
         )
 
+        print(
+            "UPDATED USER JOBS:",
+            len(jobs)
+        )
+
+        if jobs:
+
+            email_sent = send_job_email(
+                existing_user.email,
+                jobs
+            )
+
+            if email_sent:
+
+                existing_user.first_email_sent = True
+
+                existing_user.last_email_sent_date = (
+                    date.today()
+                )
+
+                db.commit()
+
+                return {
+                    "message":
+                    "User updated and immediate email sent"
+                }
+
         return {
-            "message": "User updated successfully"
+            "message":
+            "User updated but email failed"
         }
 
     # =====================================
-    # CREATE NEW USER
+    # NEW USER FLOW
     # =====================================
 
     new_user = User(
@@ -82,19 +130,51 @@ def register_user(
 
     db.refresh(new_user)
 
-    # =====================================
-    # SEND INSTANT EMAIL
-    # =====================================
+    categories = [
+        c.strip()
+        for c in new_user.categories.split(",")
+    ]
 
-    send_instant_email(
-        new_user,
-        db
+    jobs = get_jobs_for_categories(
+        categories
     )
 
+    print(
+        "NEW USER JOBS:",
+        len(jobs)
+    )
+
+    if jobs:
+
+        email_sent = send_job_email(
+            new_user.email,
+            jobs
+        )
+
+        if email_sent:
+
+            new_user.first_email_sent = True
+
+            new_user.last_email_sent_date = (
+                date.today()
+            )
+
+            db.commit()
+
+            return {
+                "message":
+                "User registered and immediate email sent"
+            }
+
     return {
-        "message": "User registered successfully"
+        "message":
+        "User registered but email failed"
     }
 
+
+# =========================================
+# GET USERS
+# =========================================
 
 @router.get("/users")
 def get_users(
