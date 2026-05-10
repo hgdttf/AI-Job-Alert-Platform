@@ -1,5 +1,3 @@
-from datetime import date
-
 from fastapi import APIRouter
 from fastapi import HTTPException
 from fastapi import Depends
@@ -7,14 +5,12 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-
 from .models import User
-
 from .schemas import UserCreate
 
-from .pipeline import get_jobs_for_categories
-
-from .email_service import send_job_email
+from .instant_email import (
+    send_instant_email
+)
 
 
 router = APIRouter()
@@ -41,17 +37,36 @@ def register_user(
         User.email == user.email
     ).first()
 
+    # =====================================
+    # UPDATE EXISTING USER
+    # =====================================
+
     if existing_user:
 
-        existing_user.categories = ",".join(user.categories)
+        existing_user.categories = ",".join(
+            user.categories
+        )
 
-        existing_user.delivery_time = user.delivery_time
+        existing_user.delivery_time = (
+            user.delivery_time
+        )
 
         db.commit()
+
+        db.refresh(existing_user)
+
+        send_instant_email(
+            existing_user,
+            db
+        )
 
         return {
             "message": "User updated successfully"
         }
+
+    # =====================================
+    # CREATE NEW USER
+    # =====================================
 
     new_user = User(
         email=user.email,
@@ -67,29 +82,14 @@ def register_user(
 
     db.refresh(new_user)
 
-    categories = [
-        c.strip()
-        for c in new_user.categories.split(",")
-    ]
+    # =====================================
+    # SEND INSTANT EMAIL
+    # =====================================
 
-    jobs = get_jobs_for_categories(categories)
-
-    print("Fetched jobs:", len(jobs))
-
-    if jobs:
-
-        email_sent = send_job_email(
-            new_user.email,
-            jobs
-        )
-
-        if email_sent:
-
-            new_user.first_email_sent = True
-
-            new_user.last_email_sent_date = date.today()
-
-            db.commit()
+    send_instant_email(
+        new_user,
+        db
+    )
 
     return {
         "message": "User registered successfully"

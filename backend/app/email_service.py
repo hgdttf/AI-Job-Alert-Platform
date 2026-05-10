@@ -7,7 +7,9 @@ from urllib3.util.retry import Retry
 from .config import settings
 
 
-RESEND_API_URL = "https://api.resend.com/emails"
+RESEND_API_URL = (
+    "https://api.resend.com/emails"
+)
 
 
 # =========================================
@@ -33,11 +35,14 @@ adapter = HTTPAdapter(
     max_retries=retry_strategy
 )
 
-session.mount("https://", adapter)
+session.mount(
+    "https://",
+    adapter
+)
 
 
 # =========================================
-# SEND JOB EMAIL
+# SEND EMAIL
 # =========================================
 
 def send_job_email(
@@ -45,114 +50,148 @@ def send_job_email(
     jobs
 ):
 
-    if not jobs:
-
-        print("No jobs found")
-
-        return False
-
-    html_jobs = ""
-
-    for job in jobs[:15]:
-
-        title = html.escape(
-            str(job.get("title", "Unknown Role"))
-        )
-
-        company = html.escape(
-            str(job.get("company", "Unknown Company"))
-        )
-
-        category = html.escape(
-            str(job.get("category", "General"))
-        )
-
-        link = str(
-            job.get("link", "#")
-        )
-
-        html_jobs += f"""
-        <div style="
-            padding:20px;
-            margin-bottom:20px;
-            border-radius:12px;
-            background:#0f172a;
-            border:1px solid #1e293b;
-        ">
-
-            <h2 style="
-                color:#38bdf8;
-                margin-bottom:10px;
-            ">
-                {title}
-            </h2>
-
-            <p style="color:white;">
-                <strong>Company:</strong> {company}
-            </p>
-
-            <p style="color:white;">
-                <strong>Category:</strong> {category}
-            </p>
-
-            <a
-                href="{link}"
-                style="
-                    display:inline-block;
-                    margin-top:10px;
-                    color:#22c55e;
-                    text-decoration:none;
-                    font-weight:bold;
-                "
-            >
-                Apply Here →
-            </a>
-
-        </div>
-        """
-
-    html_content = f"""
-    <html>
-
-    <body style="
-        background:#020617;
-        color:white;
-        font-family:Arial;
-        padding:30px;
-    ">
-
-        <h1 style="color:#38bdf8;">
-            JobPulse AI
-        </h1>
-
-        <p>
-            Latest curated opportunities for you.
-        </p>
-
-        {html_jobs}
-
-    </body>
-
-    </html>
-    """
-
-    payload = {
-        "from": settings.FROM_EMAIL,
-        "to": [receiver_email],
-        "subject": "JobPulse AI - Fresh Opportunities",
-        "html": html_content
-    }
-
-    headers = {
-        "Authorization": (
-            f"Bearer {settings.RESEND_API_KEY}"
-        ),
-        "Content-Type": "application/json"
-    }
-
     try:
 
-        print("FROM EMAIL:", settings.FROM_EMAIL)
+        if not jobs:
+
+            print(
+                "No jobs found for email"
+            )
+
+            return False
+
+        html_jobs = ""
+
+        for job in jobs[:15]:
+
+            title = html.escape(
+                str(
+                    job.get(
+                        "title",
+                        "Unknown Role"
+                    )
+                )
+            )
+
+            company = html.escape(
+                str(
+                    job.get(
+                        "company",
+                        "Unknown Company"
+                    )
+                )
+            )
+
+            category = html.escape(
+                str(
+                    job.get(
+                        "category",
+                        "General"
+                    )
+                )
+            )
+
+            link = str(
+                job.get("link", "#")
+            )
+
+            html_jobs += f"""
+            <div style="
+                padding:20px;
+                margin-bottom:20px;
+                border-radius:12px;
+                background:#0f172a;
+                border:1px solid #1e293b;
+            ">
+
+                <h2 style="
+                    color:#38bdf8;
+                    margin-bottom:10px;
+                ">
+                    {title}
+                </h2>
+
+                <p style="color:white;">
+                    <strong>Company:</strong>
+                    {company}
+                </p>
+
+                <p style="color:white;">
+                    <strong>Category:</strong>
+                    {category}
+                </p>
+
+                <a
+                    href="{link}"
+                    style="
+                        display:inline-block;
+                        margin-top:10px;
+                        color:#22c55e;
+                        text-decoration:none;
+                        font-weight:bold;
+                    "
+                >
+                    Apply Here →
+                </a>
+
+            </div>
+            """
+
+        html_content = f"""
+        <html>
+
+        <body style="
+            background:#020617;
+            color:white;
+            font-family:Arial;
+            padding:30px;
+        ">
+
+            <h1 style="color:#38bdf8;">
+                JobPulse AI
+            </h1>
+
+            <p>
+                Latest curated opportunities
+                for you.
+            </p>
+
+            {html_jobs}
+
+        </body>
+
+        </html>
+        """
+
+        payload = {
+            "from": settings.FROM_EMAIL,
+            "to": [receiver_email],
+            "subject": (
+                "JobPulse AI - "
+                "Fresh Opportunities"
+            ),
+            "html": html_content
+        }
+
+        headers = {
+            "Authorization": (
+                f"Bearer "
+                f"{settings.RESEND_API_KEY}"
+            ),
+            "Content-Type": (
+                "application/json"
+            )
+        }
+
+        print(
+            f"Sending email to "
+            f"{receiver_email}"
+        )
+
+        print(
+            f"FROM EMAIL: "
+            f"{settings.FROM_EMAIL}"
+        )
 
         response = session.post(
             RESEND_API_URL,
@@ -162,20 +201,20 @@ def send_job_email(
         )
 
         print(
-            "RESEND STATUS:",
-            response.status_code
+            f"RESEND STATUS: "
+            f"{response.status_code}"
         )
 
         print(
-            "RESEND RESPONSE:",
-            response.text
+            f"RESEND RESPONSE: "
+            f"{response.text}"
         )
 
         response.raise_for_status()
 
         print(
-            f"Email sent successfully to "
-            f"{receiver_email}"
+            f"Email sent successfully "
+            f"to {receiver_email}"
         )
 
         return True
