@@ -33,3 +33,5 @@ h11==0.16.0
 dnspython==2.8.0
 tzdata==2026.2
 colorama==0.4.6
+
+pytz==2026.1
