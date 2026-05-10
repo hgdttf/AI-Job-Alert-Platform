@@ -137,7 +137,7 @@ def send_job_email(
     """
 
     payload = {
-        "from": settings.EMAIL_FROM,
+        "from": settings.FROM_EMAIL,
         "to": [receiver_email],
         "subject": "JobPulse AI - Fresh Opportunities",
         "html": html_content
@@ -151,6 +151,8 @@ def send_job_email(
     }
 
     try:
+
+        print("FROM EMAIL:", settings.FROM_EMAIL)
 
         response = session.post(
             RESEND_API_URL,

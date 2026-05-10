@@ -7,13 +7,16 @@ class Settings(BaseSettings):
 
     RESEND_API_KEY: str
 
-    EMAIL_FROM: str = "JobPulse AI <alerts@jobpulse.xyz>"
+    FROM_EMAIL: str
 
-    FRONTEND_URL: str = "https://ai-job-alert-platform.vercel.app"
+    ADMIN_EMAIL: str
+
+    ADMIN_PASSWORD: str
 
     ENVIRONMENT: str = "production"
 
     class Config:
+
         env_file = ".env"
 
 
