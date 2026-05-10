@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import API from "./api";
 
 // =========================
@@ -21,7 +21,7 @@ const CATEGORIES = [
   { label: "Software",      icon: "💻" },
 ];
 
-const MARQUEE_ITEMS = [...CATEGORIES];
+const MARQUEE_ITEMS = [...CATEGORIES, ...CATEGORIES];
 
 // =========================
 // APP
@@ -63,12 +63,12 @@ export default function App() {
     );
 
   // ---- FETCH USERS ----
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const res = await API.get("/users");
       setUsers(Array.isArray(res.data) ? res.data : []);
     } catch (e) { console.error("Fetch users error:", e); }
-  };
+  }, []);
 
   // ---- REGISTER ----
   const registerUser = async () => {
@@ -135,7 +135,16 @@ export default function App() {
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500&display=swap');
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html { scroll-behavior: smooth; }
+        html {
+          scroll-behavior: smooth;
+          scroll-padding-top: 80px;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
 
         :root {
           --bg:          #09090B;
@@ -179,6 +188,7 @@ export default function App() {
         .orb {
           position: fixed; border-radius: 50%;
           filter: blur(130px); pointer-events: none; z-index: 0;
+          will-change: transform;
         }
         .orb1 {
           width: 560px; height: 560px; top: -160px; right: -120px;
@@ -454,6 +464,7 @@ export default function App() {
         .mq-track {
           display: flex; gap: 10px; width: max-content;
           animation: mq 30s linear infinite;
+          will-change: transform;
         }
         .mq-track:hover { animation-play-state: paused; }
         @keyframes mq { to { transform: translateX(-50%); } }
@@ -604,7 +615,13 @@ export default function App() {
 
             {/* Banner */}
             {message.text && (
-              <div className={`banner ${message.type}`}>{message.text}</div>
+              <div
+                className={`banner ${message.type}`}
+                role={message.type === "error" ? "alert" : "status"}
+                aria-live={message.type === "error" ? "assertive" : "polite"}
+              >
+                {message.text}
+              </div>
             )}
 
             {/* Email */}
@@ -680,7 +697,7 @@ export default function App() {
         <div className="mq">
           <div className="mq-track">
             {MARQUEE_ITEMS.map(({ label, icon }, i) => (
-              <div className="mq-pill" key={i}>
+              <div className="mq-pill" key={`${label}-${i}`}>
                 <span>{icon}</span>{label}
               </div>
             ))}
