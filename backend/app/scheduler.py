@@ -1,32 +1,35 @@
 from datetime import datetime
-from datetime import date
 
 import pytz
 
-from .pipeline import get_jobs_for_categories
-from .email_service import send_job_email
 from .models import User
 
+from .pipeline import get_jobs_for_categories
 
-IST = pytz.timezone("Asia/Kolkata")
+from .email_service import send_job_email
+
+
+IST = pytz.timezone(
+    "Asia/Kolkata"
+)
 
 
 def run_scheduler(db):
 
     now_ist = datetime.now(IST)
 
-    current_time = now_ist.strftime(
-        "%I:%M %p"
-    )
+    current_hour = now_ist.hour
 
-    today = date.today()
+    current_minute = now_ist.minute
 
     print(
-        f"Scheduler running for IST time: "
-        f"{current_time}"
+        f"Scheduler running at "
+        f"{now_ist.strftime('%I:%M %p')}"
     )
 
-    users = db.query(User).all()
+    users = db.query(User).filter(
+        User.is_active == True
+    ).all()
 
     processed_users = 0
 
@@ -34,38 +37,57 @@ def run_scheduler(db):
 
         try:
 
-            user_time = (
-                user.delivery_time.strip()
+            # =================================
+            # NORMALIZE USER TIME
+            # =================================
+
+            user_time = datetime.strptime(
+                user.delivery_time,
+                "%I:%M %p"
             )
 
-            print(
-                f"Checking user {user.email} "
-                f"scheduled for {user_time}"
-            )
+            user_hour = user_time.hour
 
-            # =====================================
-            # TIME MATCH
-            # =====================================
+            user_minute = user_time.minute
 
-            if user_time != current_time:
-
-                continue
-
-            # =====================================
-            # DUPLICATE PREVENTION
-            # =====================================
+            # =================================
+            # MATCH HOUR + MINUTE
+            # =================================
 
             if (
-                user.last_email_sent_date
-                == today
+                user_hour != current_hour
+                or
+                user_minute != current_minute
             ):
 
-                print(
-                    f"Skipping duplicate email "
-                    f"for {user.email}"
+                continue
+
+            # =================================
+            # DUPLICATE PREVENTION
+            # =================================
+
+            if (
+                user.last_scheduler_email_sent_at
+            ):
+
+                last_sent = (
+                    user.last_scheduler_email_sent_at
+                    .astimezone(IST)
                 )
 
-                continue
+                if (
+                    last_sent.date()
+                    ==
+                    now_ist.date()
+                ):
+
+                    print(
+                        f"Skipping duplicate "
+                        f"scheduler email for "
+                        f"{user.email}"
+                    )
+
+                    continue
 
             categories = [
                 c.strip()
@@ -78,11 +100,6 @@ def run_scheduler(db):
 
             if not jobs:
 
-                print(
-                    f"No jobs found for "
-                    f"{user.email}"
-                )
-
                 continue
 
             email_sent = send_job_email(
@@ -92,8 +109,8 @@ def run_scheduler(db):
 
             if email_sent:
 
-                user.last_email_sent_date = (
-                    today
+                user.last_scheduler_email_sent_at = (
+                    now_ist
                 )
 
                 db.commit()
@@ -101,8 +118,8 @@ def run_scheduler(db):
                 processed_users += 1
 
                 print(
-                    f"Scheduled email sent to "
-                    f"{user.email}"
+                    f"Scheduler email sent "
+                    f"to {user.email}"
                 )
 
         except Exception as e:

@@ -3,12 +3,16 @@ from datetime import datetime
 import pytz
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+
+from fastapi.middleware.cors import (
+    CORSMiddleware
+)
 
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
 from .database import engine
+
 from .models import Base
 
 from .routes import router
@@ -17,7 +21,7 @@ from .scheduler import run_scheduler
 
 
 # =========================================
-# CREATE DATABASE TABLES
+# CREATE TABLES
 # =========================================
 
 Base.metadata.create_all(
@@ -26,7 +30,7 @@ Base.metadata.create_all(
 
 
 # =========================================
-# FASTAPI APP
+# APP
 # =========================================
 
 app = FastAPI()
@@ -38,47 +42,30 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
+
     allow_origins=[
         "https://ai-job-alert-platform.vercel.app",
         "http://localhost:3000"
     ],
+
     allow_credentials=True,
+
     allow_methods=["*"],
+
     allow_headers=["*"],
 )
 
 
 # =========================================
-# INCLUDE ROUTES
+# ROUTES
 # =========================================
 
 app.include_router(router)
 
 
-# =========================================
-# IST TIMEZONE
-# =========================================
-
 IST = pytz.timezone(
     "Asia/Kolkata"
 )
-
-
-# =========================================
-# DATABASE SESSION
-# =========================================
-
-def get_db():
-
-    db = SessionLocal()
-
-    try:
-
-        yield db
-
-    finally:
-
-        db.close()
 
 
 # =========================================
@@ -89,33 +76,34 @@ def get_db():
 def root():
 
     return {
-        "message": "JobPulse API running"
+        "message":
+        "JobPulse API running"
     }
 
 
 # =========================================
-# HEALTH CHECK
+# HEALTH
 # =========================================
 
 @app.get("/health")
-def health_check():
-
-    current_time_ist = datetime.now(
-        IST
-    ).strftime("%I:%M %p")
+def health():
 
     return {
         "status": "healthy",
-        "current_time_ist": current_time_ist
+
+        "current_time_ist":
+        datetime.now(IST).strftime(
+            "%I:%M %p"
+        )
     }
 
 
 # =========================================
-# MANUAL SCHEDULER ENDPOINT
+# RUN SCHEDULER
 # =========================================
 
 @app.get("/run-scheduler")
-def run_scheduler_endpoint():
+def run_scheduler_route():
 
     db: Session = SessionLocal()
 
@@ -124,24 +112,21 @@ def run_scheduler_endpoint():
         processed_users = run_scheduler(db)
 
         return {
-            "message": (
-                "Scheduler check completed"
-            ),
-            "processed_users": (
-                processed_users
-            )
+            "message":
+            "Scheduler completed",
+
+            "processed_users":
+            processed_users
         }
 
     except Exception as e:
 
-        print(
-            f"Scheduler endpoint error: "
-            f"{str(e)}"
-        )
-
         return {
-            "message": "Scheduler failed",
-            "error": str(e)
+            "message":
+            "Scheduler failed",
+
+            "error":
+            str(e)
         }
 
     finally:

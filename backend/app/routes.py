@@ -1,7 +1,8 @@
-from datetime import date
+from datetime import datetime
+
+import pytz
 
 from fastapi import APIRouter
-from fastapi import HTTPException
 from fastapi import Depends
 
 from sqlalchemy.orm import Session
@@ -18,6 +19,10 @@ from .email_service import send_job_email
 
 
 router = APIRouter()
+
+IST = pytz.timezone(
+    "Asia/Kolkata"
+)
 
 
 # =========================================
@@ -63,6 +68,10 @@ def register_user(
             user.delivery_time
         )
 
+        existing_user.updated_at = (
+            datetime.now(IST)
+        )
+
         db.commit()
 
         categories = [
@@ -74,11 +83,6 @@ def register_user(
             categories
         )
 
-        print(
-            "Fetched jobs for updated user:",
-            len(jobs)
-        )
-
         if jobs:
 
             email_sent = send_job_email(
@@ -88,18 +92,19 @@ def register_user(
 
             if email_sent:
 
-                existing_user.first_email_sent = True
+                existing_user.onboarding_email_sent_at = (
+                    datetime.now(IST)
+                )
 
                 db.commit()
 
         return {
-            "message": (
-                "User updated successfully"
-            )
+            "message":
+            "User updated successfully"
         }
 
     # =====================================
-    # NEW USER REGISTRATION
+    # NEW USER
     # =====================================
 
     new_user = User(
@@ -109,13 +114,7 @@ def register_user(
             user.categories
         ),
 
-        delivery_time=user.delivery_time,
-
-        first_email_sent=False,
-
-        # IMPORTANT:
-        # Scheduler controls this field ONLY
-        last_email_sent_date=None
+        delivery_time=user.delivery_time
     )
 
     db.add(new_user)
@@ -133,11 +132,6 @@ def register_user(
         categories
     )
 
-    print(
-        "Fetched jobs for new user:",
-        len(jobs)
-    )
-
     if jobs:
 
         email_sent = send_job_email(
@@ -147,15 +141,15 @@ def register_user(
 
         if email_sent:
 
-            # ONLY TRACK IMMEDIATE EMAIL
-            new_user.first_email_sent = True
+            new_user.onboarding_email_sent_at = (
+                datetime.now(IST)
+            )
 
             db.commit()
 
     return {
-        "message": (
-            "User registered successfully"
-        )
+        "message":
+        "User registered successfully"
     }
 
 

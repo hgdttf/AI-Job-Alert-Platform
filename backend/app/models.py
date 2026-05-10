@@ -2,7 +2,9 @@ from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import Boolean
-from sqlalchemy import Date
+from sqlalchemy import DateTime
+
+from sqlalchemy.sql import func
 
 from .database import Base
 
@@ -34,14 +36,36 @@ class User(Base):
         nullable=False
     )
 
-    first_email_sent = Column(
+    is_active = Column(
         Boolean,
-        nullable=False,
-        default=False
+        default=True
     )
 
-    last_email_sent_date = Column(
-        Date,
-        nullable=True,
-        default=None
+    # =====================================
+    # TRACKS ONLY ONBOARDING EMAIL
+    # =====================================
+
+    onboarding_email_sent_at = Column(
+        DateTime,
+        nullable=True
+    )
+
+    # =====================================
+    # TRACKS ONLY DAILY SCHEDULER
+    # =====================================
+
+    last_scheduler_email_sent_at = Column(
+        DateTime,
+        nullable=True
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now()
     )
