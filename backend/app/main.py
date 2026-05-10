@@ -1,20 +1,33 @@
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
 from fastapi import FastAPI
 from fastapi import Depends
 from fastapi import HTTPException
-
 from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy.orm import Session
 
+from datetime import datetime
+from datetime import timedelta
+
+import pytz
+
 from .database import SessionLocal
+from .database import engine
+from .database import Base
+
 from .models import User
+
 from .schemas import UserCreate
 
 from .pipeline import get_jobs_for_categories
+
 from .email_service import send_job_email
+
+
+# =========================================
+# DATABASE TABLES
+# =========================================
+
+Base.metadata.create_all(bind=engine)
 
 
 # =========================================
@@ -22,13 +35,6 @@ from .email_service import send_job_email
 # =========================================
 
 app = FastAPI()
-
-
-# =========================================
-# CONSTANTS
-# =========================================
-
-IST = ZoneInfo("Asia/Kolkata")
 
 
 # =========================================
@@ -48,7 +54,14 @@ app.add_middleware(
 
 
 # =========================================
-# DATABASE
+# IST TIMEZONE
+# =========================================
+
+IST = pytz.timezone("Asia/Kolkata")
+
+
+# =========================================
+# DATABASE SESSION
 # =========================================
 
 def get_db():
@@ -56,9 +69,11 @@ def get_db():
     db = SessionLocal()
 
     try:
+
         yield db
 
     finally:
+
         db.close()
 
 
@@ -70,25 +85,123 @@ def get_db():
 def root():
 
     return {
-        "message": "JobPulse Backend Running"
+        "message": "JobPulse API Running"
     }
 
 
 # =========================================
-# HEALTH
+# HEALTH CHECK
 # =========================================
 
 @app.get("/health")
 def health():
 
-    current_time_ist = datetime.now(
-        IST
-    ).strftime("%I:%M %p")
+    ist_now = datetime.now(IST)
 
     return {
         "status": "healthy",
-        "current_time_ist": current_time_ist
+        "current_time_ist": ist_now.strftime(
+            "%I:%M:%S %p"
+        )
     }
+
+
+# =========================================
+# REGISTER USER
+# =========================================
+
+@app.post("/register")
+def register_user(
+    user: UserCreate,
+    db: Session = Depends(get_db)
+):
+
+    try:
+
+        existing_user = (
+            db.query(User)
+            .filter(User.email == user.email)
+            .first()
+        )
+
+        if existing_user:
+
+            existing_user.categories = ",".join(
+                user.categories
+            )
+
+            existing_user.delivery_time = (
+                user.delivery_time
+            )
+
+            db.commit()
+
+            db.refresh(existing_user)
+
+            return {
+                "message": "User updated successfully"
+            }
+
+        new_user = User(
+            email=user.email,
+            categories=",".join(user.categories),
+            delivery_time=user.delivery_time,
+            first_email_sent=False,
+            last_email_sent_date=None
+        )
+
+        db.add(new_user)
+
+        db.commit()
+
+        db.refresh(new_user)
+
+        # =========================================
+        # IMMEDIATE WELCOME EMAIL
+        # =========================================
+
+        try:
+
+            jobs = get_jobs_for_categories(
+                user.categories
+            )
+
+            if jobs and len(jobs) > 0:
+
+                send_job_email(
+                    receiver_email=user.email,
+                    jobs=jobs
+                )
+
+                print(
+                    f"Immediate email sent to "
+                    f"{user.email}"
+                )
+
+        except Exception as email_error:
+
+            print(
+                "Immediate email failed:",
+                str(email_error)
+            )
+
+        return {
+            "message": "Registration successful"
+        }
+
+    except Exception as e:
+
+        db.rollback()
+
+        print(
+            "REGISTER ERROR:",
+            str(e)
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 
 # =========================================
@@ -106,162 +219,7 @@ def get_users(
 
 
 # =========================================
-# REGISTER USER
-# =========================================
-
-@app.post("/register")
-def register_user(
-    user: UserCreate,
-    db: Session = Depends(get_db)
-):
-
-    try:
-
-        existing_user = db.query(User).filter(
-            User.email == user.email
-        ).first()
-
-        categories_string = ",".join(user.categories)
-
-        # =====================================
-        # UPDATE EXISTING USER
-        # =====================================
-
-        if existing_user:
-
-            existing_user.categories = categories_string
-
-            existing_user.delivery_time = user.delivery_time
-
-            db.commit()
-
-            db.refresh(existing_user)
-
-            target_user = existing_user
-
-        # =====================================
-        # CREATE NEW USER
-        # =====================================
-
-        else:
-
-            new_user = User(
-                email=user.email,
-                categories=categories_string,
-                delivery_time=user.delivery_time,
-                first_email_sent=False,
-                last_email_sent_date=None
-            )
-
-            db.add(new_user)
-
-            db.commit()
-
-            db.refresh(new_user)
-
-            target_user = new_user
-
-        # =====================================
-        # FETCH JOBS
-        # =====================================
-
-        try:
-
-            category_list = [
-                c.strip()
-                for c in target_user.categories.split(",")
-                if c.strip()
-            ]
-
-            jobs = get_jobs_for_categories(
-                category_list
-            )
-
-            print(
-                f"Jobs fetched: {len(jobs)}"
-            )
-
-        except Exception as e:
-
-            print(
-                "JOB FETCH ERROR:",
-                str(e)
-            )
-
-            jobs = []
-
-        # =====================================
-        # SEND WELCOME EMAIL
-        # =====================================
-
-        try:
-
-            if jobs and len(jobs) > 0:
-
-                send_job_email(
-                    receiver_email=target_user.email,
-                    jobs=jobs
-                )
-
-                # =================================
-                # IMPORTANT:
-                # Do NOT update
-                # last_email_sent_date here.
-                #
-                # Scheduler should control it.
-                # =================================
-
-                target_user.first_email_sent = True
-
-                db.commit()
-
-                print(
-                    f"Welcome email sent to "
-                    f"{target_user.email}"
-                )
-
-                return {
-                    "success": True,
-                    "message": "Alerts activated successfully"
-                }
-
-            else:
-
-                return {
-                    "success": True,
-                    "message": (
-                        "Registered successfully "
-                        "but no jobs found currently"
-                    )
-                }
-
-        except Exception as e:
-
-            print(
-                "EMAIL ERROR:",
-                str(e)
-            )
-
-            raise HTTPException(
-                status_code=500,
-                detail=f"Email sending failed: {str(e)}"
-            )
-
-    except Exception as e:
-
-        print(
-            "REGISTER ERROR:",
-            str(e)
-        )
-
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
-
-
-# =========================================
-# SCHEDULED EMAIL CHECK
+# RUN SCHEDULER
 # =========================================
 
 @app.get("/run-scheduler")
@@ -273,10 +231,6 @@ def run_scheduler(
 
         ist_now = datetime.now(IST)
 
-        current_time = ist_now.strftime(
-            "%I:%M %p"
-        )
-
         today_date = ist_now.date()
 
         users = db.query(User).all()
@@ -285,16 +239,16 @@ def run_scheduler(
 
         print(
             f"Scheduler running at "
-            f"{current_time}"
+            f"{ist_now.strftime('%I:%M:%S %p')}"
         )
 
         for user in users:
 
             try:
 
-                # ==========================
+                # =================================
                 # PREVENT DUPLICATE EMAILS
-                # ==========================
+                # =================================
 
                 if (
                     user.last_email_sent_date
@@ -303,25 +257,54 @@ def run_scheduler(
 
                     continue
 
-                # ==========================
-                # SAFE TIME COMPARISON
-                # ==========================
+                # =================================
+                # SAFE TIME PARSING
+                # =================================
 
-                user_time = datetime.strptime(
-                    user.delivery_time,
-                    "%I:%M %p"
-                ).time()
+                try:
 
-                if (
-                    user_time.hour != ist_now.hour
-                    or user_time.minute != ist_now.minute
-                ):
+                    user_time = datetime.strptime(
+                        user.delivery_time.strip(),
+                        "%I:%M %p"
+                    ).time()
+
+                except Exception:
+
+                    print(
+                        f"Invalid delivery time "
+                        f"for user {user.email}"
+                    )
 
                     continue
 
-                # ==========================
+                # =================================
+                # FLEXIBLE TIME MATCH
+                # =================================
+
+                current_minutes = (
+                    ist_now.hour * 60
+                    + ist_now.minute
+                )
+
+                user_minutes = (
+                    user_time.hour * 60
+                    + user_time.minute
+                )
+
+                difference = abs(
+                    current_minutes
+                    - user_minutes
+                )
+
+                # Allow 1 minute tolerance
+
+                if difference > 1:
+
+                    continue
+
+                # =================================
                 # CATEGORY PROCESSING
-                # ==========================
+                # =================================
 
                 category_list = [
                     c.strip()
@@ -333,37 +316,53 @@ def run_scheduler(
                     category_list
                 )
 
-                # ==========================
+                # =================================
                 # SEND EMAIL
-                # ==========================
+                # =================================
 
                 if jobs and len(jobs) > 0:
 
-                    send_job_email(
+                    email_sent = send_job_email(
                         receiver_email=user.email,
                         jobs=jobs
                     )
 
-                    user.first_email_sent = True
+                    if email_sent:
 
-                    user.last_email_sent_date = (
-                        today_date
-                    )
+                        user.first_email_sent = True
 
-                    db.commit()
+                        user.last_email_sent_date = (
+                            today_date
+                        )
 
-                    processed_users += 1
+                        db.commit()
+
+                        processed_users += 1
+
+                        print(
+                            f"Scheduled email sent to "
+                            f"{user.email}"
+                        )
+
+                    else:
+
+                        print(
+                            f"Failed sending email to "
+                            f"{user.email}"
+                        )
+
+                else:
 
                     print(
-                        f"Scheduled email sent to "
+                        f"No jobs found for "
                         f"{user.email}"
                     )
 
             except Exception as user_error:
 
                 print(
-                    f"USER PROCESS ERROR: "
-                    f"{str(user_error)}"
+                    "USER PROCESS ERROR:",
+                    str(user_error)
                 )
 
                 continue
@@ -371,7 +370,9 @@ def run_scheduler(
         return {
             "message": "Scheduled check completed",
             "processed_users": processed_users,
-            "current_time_ist": current_time
+            "current_time_ist": ist_now.strftime(
+                "%I:%M:%S %p"
+            )
         }
 
     except Exception as e:
