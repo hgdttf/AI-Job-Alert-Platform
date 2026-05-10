@@ -45,16 +45,12 @@ def register_user(
     db: Session = Depends(get_db)
 ):
 
-    # =====================================
-    # CHECK IF USER EXISTS
-    # =====================================
-
     existing_user = db.query(User).filter(
         User.email == user.email
     ).first()
 
     # =====================================
-    # EXISTING USER FLOW
+    # EXISTING USER UPDATE
     # =====================================
 
     if existing_user:
@@ -69,8 +65,6 @@ def register_user(
 
         db.commit()
 
-        db.refresh(existing_user)
-
         categories = [
             c.strip()
             for c in existing_user.categories.split(",")
@@ -81,7 +75,7 @@ def register_user(
         )
 
         print(
-            "UPDATED USER JOBS:",
+            "Fetched jobs for updated user:",
             len(jobs)
         )
 
@@ -96,31 +90,31 @@ def register_user(
 
                 existing_user.first_email_sent = True
 
-                existing_user.last_email_sent_date = (
-                    date.today()
-                )
-
                 db.commit()
 
-                return {
-                    "message":
-                    "User updated and immediate email sent"
-                }
-
         return {
-            "message":
-            "User updated but email failed"
+            "message": (
+                "User updated successfully"
+            )
         }
 
     # =====================================
-    # NEW USER FLOW
+    # NEW USER REGISTRATION
     # =====================================
 
     new_user = User(
         email=user.email,
-        categories=",".join(user.categories),
+
+        categories=",".join(
+            user.categories
+        ),
+
         delivery_time=user.delivery_time,
+
         first_email_sent=False,
+
+        # IMPORTANT:
+        # Scheduler controls this field ONLY
         last_email_sent_date=None
     )
 
@@ -140,7 +134,7 @@ def register_user(
     )
 
     print(
-        "NEW USER JOBS:",
+        "Fetched jobs for new user:",
         len(jobs)
     )
 
@@ -153,22 +147,15 @@ def register_user(
 
         if email_sent:
 
+            # ONLY TRACK IMMEDIATE EMAIL
             new_user.first_email_sent = True
-
-            new_user.last_email_sent_date = (
-                date.today()
-            )
 
             db.commit()
 
-            return {
-                "message":
-                "User registered and immediate email sent"
-            }
-
     return {
-        "message":
-        "User registered but email failed"
+        "message": (
+            "User registered successfully"
+        )
     }
 
 
