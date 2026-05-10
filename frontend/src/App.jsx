@@ -111,7 +111,6 @@ export default function App() {
   };
 
   // ── background polling for user count ──
-  const pollRef = useRef(null);
   const startPollingUsers = () => {
     if (pollRef.current) clearInterval(pollRef.current);
     let attempts = 0;
