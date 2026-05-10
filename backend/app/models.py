@@ -36,10 +36,12 @@ class User(Base):
 
     first_email_sent = Column(
         Boolean,
+        nullable=False,
         default=False
     )
 
     last_email_sent_date = Column(
         Date,
-        nullable=True
+        nullable=True,
+        default=None
     )

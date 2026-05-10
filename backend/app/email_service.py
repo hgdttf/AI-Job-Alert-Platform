@@ -1,4 +1,8 @@
+import html
 import requests
+
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .config import settings
 
@@ -6,20 +10,66 @@ from .config import settings
 RESEND_API_URL = "https://api.resend.com/emails"
 
 
-def send_job_email(receiver_email, jobs):
+# =========================================
+# SESSION WITH RETRY STRATEGY
+# =========================================
+
+session = requests.Session()
+
+retry_strategy = Retry(
+    total=3,
+    backoff_factor=1,
+    status_forcelist=[
+        429,
+        500,
+        502,
+        503,
+        504
+    ],
+    allowed_methods=["POST"]
+)
+
+adapter = HTTPAdapter(
+    max_retries=retry_strategy
+)
+
+session.mount("https://", adapter)
+
+
+# =========================================
+# SEND JOB EMAIL
+# =========================================
+
+def send_job_email(
+    receiver_email,
+    jobs
+):
 
     if not jobs:
+
         print("No jobs found")
+
         return False
 
     html_jobs = ""
 
     for job in jobs[:15]:
 
-        title = job.get("title", "Unknown Role")
-        company = job.get("company", "Unknown Company")
-        category = job.get("category", "General")
-        link = job.get("link", "#")
+        title = html.escape(
+            str(job.get("title", "Unknown Role"))
+        )
+
+        company = html.escape(
+            str(job.get("company", "Unknown Company"))
+        )
+
+        category = html.escape(
+            str(job.get("category", "General"))
+        )
+
+        link = str(
+            job.get("link", "#")
+        )
 
         html_jobs += f"""
         <div style="
@@ -61,7 +111,7 @@ def send_job_email(receiver_email, jobs):
         </div>
         """
 
-    html = f"""
+    html_content = f"""
     <html>
 
     <body style="
@@ -90,34 +140,74 @@ def send_job_email(receiver_email, jobs):
         "from": settings.EMAIL_FROM,
         "to": [receiver_email],
         "subject": "JobPulse AI - Fresh Opportunities",
-        "html": html
+        "html": html_content
     }
 
     headers = {
-        "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+        "Authorization": (
+            f"Bearer {settings.RESEND_API_KEY}"
+        ),
         "Content-Type": "application/json"
     }
 
     try:
 
-        response = requests.post(
+        response = session.post(
             RESEND_API_URL,
             json=payload,
             headers=headers,
             timeout=30
         )
 
-        print("RESEND STATUS:", response.status_code)
-        print("RESEND RESPONSE:", response.text)
+        print(
+            "RESEND STATUS:",
+            response.status_code
+        )
+
+        print(
+            "RESEND RESPONSE:",
+            response.text
+        )
 
         response.raise_for_status()
 
-        print(f"Email sent successfully to {receiver_email}")
+        print(
+            f"Email sent successfully to "
+            f"{receiver_email}"
+        )
 
         return True
 
+    except requests.exceptions.Timeout:
+
+        print(
+            f"EMAIL TIMEOUT for "
+            f"{receiver_email}"
+        )
+
+        return False
+
+    except requests.exceptions.HTTPError as e:
+
+        print(
+            f"HTTP ERROR: {str(e)}"
+        )
+
+        return False
+
+    except requests.exceptions.RequestException as e:
+
+        print(
+            f"REQUEST ERROR: {str(e)}"
+        )
+
+        return False
+
     except Exception as e:
 
-        print("EMAIL ERROR:", str(e))
+        print(
+            f"UNEXPECTED EMAIL ERROR: "
+            f"{str(e)}"
+        )
 
         return False

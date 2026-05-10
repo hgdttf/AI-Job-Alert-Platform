@@ -8,10 +8,13 @@ on:
 
 jobs:
   trigger-job-check:
+
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Trigger backend scheduler endpoint
 
         run: |
-          curl -X GET "https://jobpulse-hghkebgcafc5erda.eastus-01.azurewebsites.net/run-job-check"
+          curl --fail --silent --show-error \
+          "https://jobpulse-hghkebgcafc5erda.eastus-01.azurewebsites.net/run-scheduler"

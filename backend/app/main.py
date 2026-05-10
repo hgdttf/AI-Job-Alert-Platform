@@ -1,5 +1,4 @@
-from datetime import datetime, date
-
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
@@ -23,6 +22,13 @@ from .email_service import send_job_email
 # =========================================
 
 app = FastAPI()
+
+
+# =========================================
+# CONSTANTS
+# =========================================
+
+IST = ZoneInfo("Asia/Kolkata")
 
 
 # =========================================
@@ -76,7 +82,7 @@ def root():
 def health():
 
     current_time_ist = datetime.now(
-        ZoneInfo("Asia/Kolkata")
+        IST
     ).strftime("%I:%M %p")
 
     return {
@@ -185,7 +191,7 @@ def register_user(
             jobs = []
 
         # =====================================
-        # SEND EMAIL IMMEDIATELY
+        # SEND WELCOME EMAIL
         # =====================================
 
         try:
@@ -197,14 +203,20 @@ def register_user(
                     jobs=jobs
                 )
 
-                target_user.first_email_sent = True
+                # =================================
+                # IMPORTANT:
+                # Do NOT update
+                # last_email_sent_date here.
+                #
+                # Scheduler should control it.
+                # =================================
 
-                target_user.last_email_sent_date = date.today()
+                target_user.first_email_sent = True
 
                 db.commit()
 
                 print(
-                    f"Immediate email sent to "
+                    f"Welcome email sent to "
                     f"{target_user.email}"
                 )
 
@@ -217,7 +229,10 @@ def register_user(
 
                 return {
                     "success": True,
-                    "message": "Registered successfully but no jobs found currently"
+                    "message": (
+                        "Registered successfully "
+                        "but no jobs found currently"
+                    )
                 }
 
         except Exception as e:
@@ -256,15 +271,13 @@ def run_scheduler(
 
     try:
 
-        ist_now = datetime.now(
-            ZoneInfo("Asia/Kolkata")
-        )
+        ist_now = datetime.now(IST)
 
         current_time = ist_now.strftime(
             "%I:%M %p"
         )
 
-        today_date = date.today()
+        today_date = ist_now.date()
 
         users = db.query(User).all()
 
@@ -291,15 +304,24 @@ def run_scheduler(
                     continue
 
                 # ==========================
-                # TIME CHECK
+                # SAFE TIME COMPARISON
                 # ==========================
 
+                user_time = datetime.strptime(
+                    user.delivery_time,
+                    "%I:%M %p"
+                ).time()
+
                 if (
-                    user.delivery_time
-                    != current_time
+                    user_time.hour != ist_now.hour
+                    or user_time.minute != ist_now.minute
                 ):
 
                     continue
+
+                # ==========================
+                # CATEGORY PROCESSING
+                # ==========================
 
                 category_list = [
                     c.strip()
@@ -310,6 +332,10 @@ def run_scheduler(
                 jobs = get_jobs_for_categories(
                     category_list
                 )
+
+                # ==========================
+                # SEND EMAIL
+                # ==========================
 
                 if jobs and len(jobs) > 0:
 
