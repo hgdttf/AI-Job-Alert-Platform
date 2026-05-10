@@ -1,9 +1,6 @@
-from datetime import datetime
-
-import pytz
-
 from fastapi import APIRouter
 from fastapi import Depends
+from fastapi import HTTPException
 
 from sqlalchemy.orm import Session
 
@@ -13,21 +10,15 @@ from .models import User
 
 from .schemas import UserCreate
 
-from .pipeline import get_jobs_for_categories
-
-from .email_service import send_job_email
+from .instant_email import send_instant_email
 
 
 router = APIRouter()
 
-IST = pytz.timezone(
-    "Asia/Kolkata"
-)
 
-
-# =========================================
+# =========================================================
 # DATABASE SESSION
-# =========================================
+# =========================================================
 
 def get_db():
 
@@ -40,9 +31,9 @@ def get_db():
         db.close()
 
 
-# =========================================
-# REGISTER / UPDATE USER
-# =========================================
+# =========================================================
+# REGISTER USER
+# =========================================================
 
 @router.post("/register")
 def register_user(
@@ -50,118 +41,110 @@ def register_user(
     db: Session = Depends(get_db)
 ):
 
-    existing_user = db.query(User).filter(
-        User.email == user.email
-    ).first()
+    try:
 
-    # =====================================
-    # EXISTING USER UPDATE
-    # =====================================
+        existing_user = db.query(User).filter(
+            User.email == user.email
+        ).first()
 
-    if existing_user:
+        # =====================================
+        # UPDATE EXISTING USER
+        # =====================================
 
-        existing_user.categories = ",".join(
-            user.categories
-        )
+        if existing_user:
 
-        existing_user.delivery_time = (
-            user.delivery_time
-        )
-
-        existing_user.updated_at = (
-            datetime.now(IST)
-        )
-
-        db.commit()
-
-        categories = [
-            c.strip()
-            for c in existing_user.categories.split(",")
-        ]
-
-        jobs = get_jobs_for_categories(
-            categories
-        )
-
-        if jobs:
-
-            email_sent = send_job_email(
-                existing_user.email,
-                jobs
+            existing_user.categories = ",".join(
+                user.categories
             )
 
-            if email_sent:
-
-                existing_user.onboarding_email_sent_at = (
-                    datetime.now(IST)
-                )
-
-                db.commit()
-
-        return {
-            "message":
-            "User updated successfully"
-        }
-
-    # =====================================
-    # NEW USER
-    # =====================================
-
-    new_user = User(
-        email=user.email,
-
-        categories=",".join(
-            user.categories
-        ),
-
-        delivery_time=user.delivery_time
-    )
-
-    db.add(new_user)
-
-    db.commit()
-
-    db.refresh(new_user)
-
-    categories = [
-        c.strip()
-        for c in new_user.categories.split(",")
-    ]
-
-    jobs = get_jobs_for_categories(
-        categories
-    )
-
-    if jobs:
-
-        email_sent = send_job_email(
-            new_user.email,
-            jobs
-        )
-
-        if email_sent:
-
-            new_user.onboarding_email_sent_at = (
-                datetime.now(IST)
+            existing_user.delivery_time = (
+                user.delivery_time
             )
+
+            existing_user.is_active = True
 
             db.commit()
 
-    return {
-        "message":
-        "User registered successfully"
-    }
+            db.refresh(existing_user)
+
+            # =================================
+            # SEND UPDATED ONBOARDING EMAIL
+            # =================================
+
+            send_instant_email(
+                db=db,
+                user=existing_user
+            )
+
+            return {
+                "message":
+                "User updated successfully"
+            }
+
+        # =====================================
+        # CREATE NEW USER
+        # =====================================
+
+        new_user = User(
+            email=user.email,
+
+            categories=",".join(
+                user.categories
+            ),
+
+            delivery_time=user.delivery_time,
+
+            is_active=True
+        )
+
+        db.add(new_user)
+
+        db.commit()
+
+        db.refresh(new_user)
+
+        # =====================================
+        # SEND ONBOARDING EMAIL
+        # =====================================
+
+        send_instant_email(
+            db=db,
+            user=new_user
+        )
+
+        return {
+            "message":
+            "User registered successfully"
+        }
+
+    except Exception as e:
+
+        db.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 
-# =========================================
+# =========================================================
 # GET USERS
-# =========================================
+# =========================================================
 
 @router.get("/users")
 def get_users(
     db: Session = Depends(get_db)
 ):
 
-    users = db.query(User).all()
+    try:
 
-    return users
+        users = db.query(User).all()
+
+        return users
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )

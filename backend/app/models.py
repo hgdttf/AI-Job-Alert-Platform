@@ -1,10 +1,12 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import Boolean
+from sqlalchemy import Date
 from sqlalchemy import DateTime
-
-from sqlalchemy.sql import func
+from sqlalchemy import Text
 
 from .database import Base
 
@@ -22,8 +24,8 @@ class User(Base):
     email = Column(
         String,
         unique=True,
-        nullable=False,
-        index=True
+        index=True,
+        nullable=False
     )
 
     categories = Column(
@@ -36,23 +38,25 @@ class User(Base):
         nullable=False
     )
 
+    first_email_sent = Column(
+        Boolean,
+        default=False
+    )
+
+    last_email_sent_date = Column(
+        Date,
+        nullable=True
+    )
+
     is_active = Column(
         Boolean,
         default=True
     )
 
-    # =====================================
-    # TRACKS ONLY ONBOARDING EMAIL
-    # =====================================
-
     onboarding_email_sent_at = Column(
         DateTime,
         nullable=True
     )
-
-    # =====================================
-    # TRACKS ONLY DAILY SCHEDULER
-    # =====================================
 
     last_scheduler_email_sent_at = Column(
         DateTime,
@@ -60,12 +64,48 @@ class User(Base):
     )
 
     created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now()
+        DateTime,
+        default=lambda: datetime.now(timezone.utc)
     )
 
     updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now()
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+
+class EmailLog(Base):
+
+    __tablename__ = "email_logs"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    user_email = Column(
+        String,
+        nullable=False
+    )
+
+    email_type = Column(
+        String,
+        nullable=False
+    )
+
+    status = Column(
+        String,
+        nullable=False
+    )
+
+    message = Column(
+        Text,
+        nullable=True
+    )
+
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc)
     )

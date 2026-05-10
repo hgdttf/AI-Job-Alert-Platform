@@ -2,11 +2,15 @@ from datetime import datetime
 
 import pytz
 
+from sqlalchemy.orm import Session
+
+from .database import SessionLocal
 from .models import User
-
 from .pipeline import get_jobs_for_categories
-
-from .email_service import send_job_email
+from .email_service import (
+    send_job_email,
+    create_email_log
+)
 
 
 IST = pytz.timezone(
@@ -14,119 +18,207 @@ IST = pytz.timezone(
 )
 
 
-def run_scheduler(db):
+def normalize_time_string(
+    value: str
+):
 
-    now_ist = datetime.now(IST)
-
-    current_hour = now_ist.hour
-
-    current_minute = now_ist.minute
-
-    print(
-        f"Scheduler running at "
-        f"{now_ist.strftime('%I:%M %p')}"
+    return (
+        value.strip()
+        .upper()
+        .replace(".", "")
     )
 
-    users = db.query(User).filter(
-        User.is_active == True
-    ).all()
 
-    processed_users = 0
+def run_scheduler():
 
-    for user in users:
+    db: Session = SessionLocal()
 
-        try:
+    try:
 
-            # =================================
-            # NORMALIZE USER TIME
-            # =================================
+        now_ist = datetime.now(IST)
 
-            user_time = datetime.strptime(
-                user.delivery_time,
-                "%I:%M %p"
+        current_time_ist = (
+            now_ist.strftime("%I:%M %p")
+        )
+
+        normalized_current_time = (
+            normalize_time_string(
+                current_time_ist
             )
+        )
 
-            user_hour = user_time.hour
+        print(
+            f"SCHEDULER RUNNING AT: "
+            f"{normalized_current_time}"
+        )
 
-            user_minute = user_time.minute
+        users = db.query(User).filter(
+            User.is_active == True
+        ).all()
 
-            # =================================
-            # MATCH HOUR + MINUTE
-            # =================================
+        processed_users = 0
 
-            if (
-                user_hour != current_hour
-                or
-                user_minute != current_minute
-            ):
+        for user in users:
 
-                continue
+            try:
 
-            # =================================
-            # DUPLICATE PREVENTION
-            # =================================
-
-            if (
-                user.last_scheduler_email_sent_at
-            ):
-
-                last_sent = (
-                    user.last_scheduler_email_sent_at
-                    .astimezone(IST)
+                delivery_time = (
+                    normalize_time_string(
+                        user.delivery_time
+                    )
                 )
 
                 if (
-                    last_sent.date()
-                    ==
-                    now_ist.date()
+                    delivery_time
+                    !=
+                    normalized_current_time
                 ):
 
-                    print(
-                        f"Skipping duplicate "
-                        f"scheduler email for "
-                        f"{user.email}"
+                    continue
+
+                # =====================================
+                # DUPLICATE PREVENTION
+                # =====================================
+
+                if (
+                    user.last_scheduler_email_sent_at
+                ):
+
+                    last_sent_ist = (
+                        user
+                        .last_scheduler_email_sent_at
+                        .astimezone(IST)
+                    )
+
+                    if (
+                        last_sent_ist.date()
+                        ==
+                        now_ist.date()
+                    ):
+
+                        print(
+                            f"SKIPPING DUPLICATE: "
+                            f"{user.email}"
+                        )
+
+                        continue
+
+                categories = [
+                    c.strip()
+                    for c in user.categories.split(",")
+                    if c.strip()
+                ]
+
+                jobs = get_jobs_for_categories(
+                    categories
+                )
+
+                print(
+                    f"SCHEDULER JOBS "
+                    f"{user.email}: "
+                    f"{len(jobs)}"
+                )
+
+                if not jobs:
+
+                    create_email_log(
+                        db=db,
+                        user_email=user.email,
+                        email_type="scheduler",
+                        status="failed",
+                        message="No jobs found"
                     )
 
                     continue
 
-            categories = [
-                c.strip()
-                for c in user.categories.split(",")
-            ]
-
-            jobs = get_jobs_for_categories(
-                categories
-            )
-
-            if not jobs:
-
-                continue
-
-            email_sent = send_job_email(
-                user.email,
-                jobs
-            )
-
-            if email_sent:
-
-                user.last_scheduler_email_sent_at = (
-                    now_ist
+                email_sent = send_job_email(
+                    receiver_email=user.email,
+                    jobs=jobs,
+                    email_type="scheduler"
                 )
 
-                db.commit()
+                if email_sent:
 
-                processed_users += 1
+                    user.last_scheduler_email_sent_at = (
+                        now_ist
+                    )
+
+                    db.commit()
+
+                    processed_users += 1
+
+                    create_email_log(
+                        db=db,
+                        user_email=user.email,
+                        email_type="scheduler",
+                        status="success",
+                        message="Scheduler email sent"
+                    )
+
+                    print(
+                        f"SCHEDULER EMAIL SENT: "
+                        f"{user.email}"
+                    )
+
+                else:
+
+                    create_email_log(
+                        db=db,
+                        user_email=user.email,
+                        email_type="scheduler",
+                        status="failed",
+                        message="Email sending failed"
+                    )
+
+            except Exception as user_error:
 
                 print(
-                    f"Scheduler email sent "
-                    f"to {user.email}"
+                    f"SCHEDULER USER ERROR: "
+                    f"{str(user_error)}"
                 )
 
-        except Exception as e:
+                create_email_log(
+                    db=db,
+                    user_email=user.email,
+                    email_type="scheduler",
+                    status="failed",
+                    message=str(user_error)
+                )
 
-            print(
-                f"Scheduler error for "
-                f"{user.email}: {str(e)}"
-            )
+                db.rollback()
 
-    return processed_users
+        print(
+            f"SCHEDULER COMPLETED: "
+            f"{processed_users}"
+        )
+
+        return {
+            "message":
+            "Scheduler completed",
+
+            "processed_users":
+            processed_users,
+
+            "current_time_ist":
+            current_time_ist
+        }
+
+    except Exception as e:
+
+        print(
+            f"SCHEDULER ERROR: {str(e)}"
+        )
+
+        db.rollback()
+
+        return {
+            "message":
+            "Scheduler failed",
+
+            "error":
+            str(e)
+        }
+
+    finally:
+
+        db.close()
