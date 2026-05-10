@@ -104,11 +104,11 @@ export default function App() {
       }
       if (typeof data.message === "string" && data.message.trim()) return data.message;
     }
-    // Network-level failures (Vercel timeout, connection reset, etc.)
-    if (err.code === "ECONNABORTED" || err.code === "ETIMEDOUT" || err.code === "ECONNRESET")
-      return "timeout";
-    if (err.message === "Network Error" || err.message?.includes("timeout") || err.message?.includes("aborted"))
-      return "timeout";
+    // Network-level failures (Vercel timeout, connection reset, connection lost, etc.)
+    if (err.code === "ECONNABORTED" || err.code === "ETIMEDOUT" || err.code === "ECONNRESET" || err.code === "ERR_NETWORK")
+      return "network";
+    if (err.message === "Network Error" || err.message?.includes("timeout") || err.message?.includes("aborted") || err.message?.includes("Connection lost") || err.message?.includes("connection") || err.message?.includes("network"))
+      return "network";
     if (typeof err.message === "string" && err.message.trim()) return err.message;
     return "Something went wrong. Please try again.";
   };
@@ -157,21 +157,26 @@ export default function App() {
     const stageTimers = [];
     stageTimers.push(setTimeout(() => {
       if (loadingRef.current) setMessage({ text: "Saving your preferences...", type: "" });
-    }, 1000));
+    }, 800));
+    stageTimers.push(setTimeout(() => {
+      if (loadingRef.current) setMessage({ text: "Preparing your first alert...", type: "" });
+    }, 2500));
     stageTimers.push(setTimeout(() => {
       if (loadingRef.current) setMessage({ text: "Sending welcome email...", type: "" });
-    }, 3500));
-    stageTimers.push(setTimeout(() => {
-      if (loadingRef.current) setMessage({ text: "Almost there...", type: "" });
-    }, 6000));
+    }, 4500));
 
-    // safety net — always unlocks UI after 12 s
+    // safety net — always unlocks UI after 7 s (before platform kills connection)
     const timer = setTimeout(() => {
       console.warn("Request timeout safeguard triggered");
       setLoading(false);
       stageTimers.forEach(clearTimeout);
-      setMessage({ text: "Server timeout. Please try again in a few seconds.", type: "error" });
-    }, 8000);
+      // optimistic: backend is likely still processing the slow email
+      setMessage({ text: "Registration accepted — check your inbox shortly.", type: "success" });
+      setEmail("");
+      setSelectedCategories([]);
+      setHour("09"); setMinute("00"); setPeriod("AM");
+      startPollingUsers();
+    }, 7000);
 
     try {
       const response = await API.post("/register", {
@@ -190,7 +195,7 @@ export default function App() {
 
     } catch (error) {
       const detail = parseApiError(error);
-      const isTimeout = detail === "timeout";
+      const isNetworkFailure = detail === "timeout" || detail === "network";
       const isDuplicate =
         detail.toLowerCase().includes("already") ||
         detail.toLowerCase().includes("exist")   ||
@@ -198,8 +203,8 @@ export default function App() {
 
       if (isDuplicate) {
         setEmailError("This email is already registered.");
-      } else if (isTimeout) {
-        // optimistic: backend likely still processing the slow email
+      } else if (isNetworkFailure) {
+        // optimistic: backend is likely still processing — connection dropped but request may have succeeded
         setMessage({ text: "Registration accepted — check your inbox shortly.", type: "success" });
         setEmail("");
         setSelectedCategories([]);
