@@ -104,8 +104,11 @@ export default function App() {
       }
       if (typeof data.message === "string" && data.message.trim()) return data.message;
     }
-    if (err.code === "ECONNABORTED" || err.message === "Network Error")
-      return "Connection failed. Please check your internet and try again.";
+    // Network-level failures (Vercel timeout, connection reset, etc.)
+    if (err.code === "ECONNABORTED" || err.code === "ETIMEDOUT" || err.code === "ECONNRESET")
+      return "timeout";
+    if (err.message === "Network Error" || err.message?.includes("timeout") || err.message?.includes("aborted"))
+      return "timeout";
     if (typeof err.message === "string" && err.message.trim()) return err.message;
     return "Something went wrong. Please try again.";
   };
@@ -154,13 +157,13 @@ export default function App() {
     const stageTimers = [];
     stageTimers.push(setTimeout(() => {
       if (loadingRef.current) setMessage({ text: "Saving your preferences...", type: "" });
-    }, 1500));
+    }, 1000));
     stageTimers.push(setTimeout(() => {
-      if (loadingRef.current) setMessage({ text: "Preparing your first alert...", type: "" });
-    }, 5000));
+      if (loadingRef.current) setMessage({ text: "Sending welcome email...", type: "" });
+    }, 3500));
     stageTimers.push(setTimeout(() => {
-      if (loadingRef.current) setMessage({ text: "Sending welcome email (this may take a moment)...", type: "" });
-    }, 9000));
+      if (loadingRef.current) setMessage({ text: "Almost there...", type: "" });
+    }, 6000));
 
     // safety net — always unlocks UI after 12 s
     const timer = setTimeout(() => {
@@ -168,7 +171,7 @@ export default function App() {
       setLoading(false);
       stageTimers.forEach(clearTimeout);
       setMessage({ text: "Server timeout. Please try again in a few seconds.", type: "error" });
-    }, 20000);
+    }, 8000);
 
     try {
       const response = await API.post("/register", {
@@ -187,7 +190,7 @@ export default function App() {
 
     } catch (error) {
       const detail = parseApiError(error);
-      const isTimeout = detail.toLowerCase().includes("timeout") || detail.toLowerCase().includes("busy");
+      const isTimeout = detail === "timeout";
       const isDuplicate =
         detail.toLowerCase().includes("already") ||
         detail.toLowerCase().includes("exist")   ||
