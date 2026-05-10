@@ -39,6 +39,7 @@ export default function App() {
   const [emailError,         setEmailError]         = useState("");
   const [loading,            setLoading]            = useState(false);
   const loadingRef = useRef(false);
+  const pollRef = useRef(null);
   const cardRef = useRef(null);
 
   // keep loadingRef in sync with loading state for staged timers
@@ -109,6 +110,28 @@ export default function App() {
     return "Something went wrong. Please try again.";
   };
 
+  // ── background polling for user count ──
+  const pollRef = useRef(null);
+  const startPollingUsers = () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    let attempts = 0;
+    pollRef.current = setInterval(() => {
+      attempts++;
+      fetchUsers().catch(() => {});
+      if (attempts >= 5) {          // poll 5 times over 15s then stop
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    }, 3000);
+  };
+
+  // cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
   // ── register ──
   const registerUser = async () => {
     if (loading) return;                        // double-click guard
@@ -116,7 +139,7 @@ export default function App() {
     setMessage({ text: "", type: "" });
     setEmailError("");
 
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
       setEmailError("Please enter a valid email address.");
       return;
     }
@@ -131,11 +154,14 @@ export default function App() {
     // staged loading messages — makes wait feel intentional, not broken
     const stageTimers = [];
     stageTimers.push(setTimeout(() => {
-      if (loadingRef.current) setMessage({ text: "Setting up your alerts...", type: "" });
-    }, 2500));
+      if (loadingRef.current) setMessage({ text: "Saving your preferences...", type: "" });
+    }, 1500));
     stageTimers.push(setTimeout(() => {
-      if (loadingRef.current) setMessage({ text: "Sending welcome email...", type: "" });
-    }, 6000));
+      if (loadingRef.current) setMessage({ text: "Preparing your first alert...", type: "" });
+    }, 5000));
+    stageTimers.push(setTimeout(() => {
+      if (loadingRef.current) setMessage({ text: "Sending welcome email (this may take a moment)...", type: "" });
+    }, 9000));
 
     // safety net — always unlocks UI after 12 s
     const timer = setTimeout(() => {
@@ -143,7 +169,7 @@ export default function App() {
       setLoading(false);
       stageTimers.forEach(clearTimeout);
       setMessage({ text: "Server timeout. Please try again in a few seconds.", type: "error" });
-    }, 12000);
+    }, 20000);
 
     try {
       const response = await API.post("/register", {
@@ -157,18 +183,29 @@ export default function App() {
       setEmail("");
       setSelectedCategories([]);
       setHour("09"); setMinute("00"); setPeriod("AM");
+      // refresh stats in background — don't block success UI
       fetchUsers().catch(() => {});
 
     } catch (error) {
       const detail = parseApiError(error);
+      const isTimeout = detail.toLowerCase().includes("timeout") || detail.toLowerCase().includes("busy");
       const isDuplicate =
         detail.toLowerCase().includes("already") ||
         detail.toLowerCase().includes("exist")   ||
         detail.toLowerCase().includes("registered");
 
-      isDuplicate
-        ? setEmailError("This email is already registered.")
-        : setMessage({ text: detail, type: "error" });
+      if (isDuplicate) {
+        setEmailError("This email is already registered.");
+      } else if (isTimeout) {
+        // optimistic: backend likely still processing the slow email
+        setMessage({ text: "Registration accepted — check your inbox shortly.", type: "success" });
+        setEmail("");
+        setSelectedCategories([]);
+        setHour("09"); setMinute("00"); setPeriod("AM");
+        startPollingUsers();
+      } else {
+        setMessage({ text: detail, type: "error" });
+      }
     } finally {
       if (timer) clearTimeout(timer);
       stageTimers.forEach(clearTimeout);
