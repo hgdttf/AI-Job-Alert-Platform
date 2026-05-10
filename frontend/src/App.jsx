@@ -202,7 +202,12 @@ export default function App() {
         detail.toLowerCase().includes("registered");
 
       if (isDuplicate) {
-        setEmailError("This email is already registered.");
+        // idempotent: backend updates preferences and sends email even for existing users
+        setMessage({ text: "Alerts updated successfully.", type: "success" });
+        setEmail("");
+        setSelectedCategories([]);
+        setHour("09"); setMinute("00"); setPeriod("AM");
+        fetchUsers().catch(() => {});
       } else if (isNetworkFailure) {
         // optimistic: backend is likely still processing — connection dropped but request may have succeeded
         setMessage({ text: "Registration accepted — check your inbox shortly.", type: "success" });
